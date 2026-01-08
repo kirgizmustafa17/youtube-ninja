@@ -25,6 +25,7 @@ from PyQt5.QtCore import QUrl
 from downloader import YouTubeDownloader
 from ui.download_window import DownloadWindow
 from config_manager import get_config_manager, ConfigManager
+from logger import log_info, log_error, log_warning, log_download_start, log_download_complete, log_download_error
 
 
 class FFmpegDownloader(QThread):
@@ -251,6 +252,8 @@ class YouTubeDownloaderApp:
         self.timer = QTimer()
         self.timer.timeout.connect(lambda: None)
         self.timer.start(500)
+        
+        log_info("Application started")
     
     def _check_ffmpeg_startup(self):
         """Check if FFmpeg is available at startup"""
@@ -276,6 +279,8 @@ class YouTubeDownloaderApp:
             if reply == QMessageBox.Yes:
                 # Trigger FFmpeg download after app starts
                 QTimer.singleShot(1000, self._download_ffmpeg)
+        else:
+            log_info("FFmpeg found")
     
     def setup_tray_icon(self):
         """Setup system tray icon and menu"""
@@ -510,6 +515,10 @@ class YouTubeDownloaderApp:
             )
             
             if success:
+                log_download_complete(
+                    self.current_window.video_info.get('title', 'Unknown'),
+                    video_success, audio_success
+                )
                 msg = "İndirme tamamlandı!\n"
                 if video_success:
                     msg += "📹 Video: ~/Videos\n"
@@ -523,6 +532,10 @@ class YouTubeDownloaderApp:
                     3000
                 )
             else:
+                log_download_error(
+                    self.current_window.video_info.get('title', 'Unknown'),
+                    "Download failed"
+                )
                 self.tray_icon.showMessage(
                     "İndirme Başarısız",
                     "Video indirilemedi. Lütfen tekrar deneyin.",

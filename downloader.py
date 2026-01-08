@@ -1,11 +1,12 @@
 """
 YouTube Downloader - yt-dlp wrapper module
 Downloads videos with AV1/AVC support and best audio as MP3
-Supports up to 8K resolution
+Supports up to 8K resolution with retry mechanism
 """
 
 import os
 import re
+import time
 import yt_dlp
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
@@ -23,6 +24,10 @@ class YouTubeDownloader:
     # 1440p and above: AV1 + m4a (OPUS) for better quality at high resolutions
     HIGH_RES_THRESHOLD = 1440
     
+    # Retry settings
+    MAX_RETRIES = 3
+    RETRY_DELAYS = [2, 5, 10]  # Seconds to wait between retries (exponential backoff)
+    
     def __init__(self):
         self.home_dir = Path.home()
         self.videos_dir = self.home_dir / "Videos"
@@ -33,6 +38,42 @@ class YouTubeDownloader:
         self.music_dir.mkdir(exist_ok=True)
         
         self._cancel_requested = False
+    
+    def _retry_download(self, download_func, *args, **kwargs) -> bool:
+        """
+        Retry wrapper for download functions with exponential backoff
+        
+        Args:
+            download_func: The download function to retry
+            *args, **kwargs: Arguments to pass to the download function
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        last_error = None
+        
+        for attempt in range(self.MAX_RETRIES):
+            if self._cancel_requested:
+                return False
+            
+            try:
+                result = download_func(*args, **kwargs)
+                if result:
+                    return True
+            except Exception as e:
+                last_error = e
+                if "cancelled" in str(e).lower():
+                    return False
+                
+                if attempt < self.MAX_RETRIES - 1:
+                    delay = self.RETRY_DELAYS[attempt]
+                    print(f"Download failed (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}")
+                    print(f"Retrying in {delay} seconds...")
+                    time.sleep(delay)
+        
+        if last_error:
+            print(f"All {self.MAX_RETRIES} attempts failed: {last_error}")
+        return False
     
     @classmethod
     def is_youtube_url(cls, text: str) -> bool:
@@ -117,15 +158,17 @@ class YouTubeDownloader:
         
         safe_title = self._sanitize_filename(info['title'])
         
-        # Download audio (MP3) first - it's faster
+        # Download audio (MP3) first - it's faster, with retry
         if download_audio and not self._cancel_requested:
-            results['audio'] = self._download_audio_file(
+            results['audio'] = self._retry_download(
+                self._download_audio_file,
                 url, safe_title, progress_callback, audio_quality
             )
         
-        # Download video after audio
+        # Download video after audio, with retry
         if download_video and not self._cancel_requested:
-            results['video'] = self._download_video_file(
+            results['video'] = self._retry_download(
+                self._download_video_file,
                 url, safe_title, progress_callback, video_quality
             )
         

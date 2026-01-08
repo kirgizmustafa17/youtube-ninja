@@ -423,7 +423,12 @@ class YouTubeDownloaderApp:
     
     def _start_download(self, url: str, video_info: dict):
         """Start the download process"""
-        self.current_window = DownloadWindow(video_info)
+        self.current_window = DownloadWindow(
+            video_info,
+            video_quality=self.config.video_quality,
+            download_video=self.config.download_video,
+            download_audio=self.config.download_mp3
+        )
         self.current_window.download_cancelled.connect(self._on_download_cancelled)
         
         # Update window labels based on options

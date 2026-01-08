@@ -81,9 +81,13 @@ class DownloadWindow(QDialog):
     
     download_cancelled = pyqtSignal()
     
-    def __init__(self, video_info: dict, parent=None):
+    def __init__(self, video_info: dict, video_quality: str = '1080', 
+                 download_video: bool = True, download_audio: bool = True, parent=None):
         super().__init__(parent)
         self.video_info = video_info
+        self.video_quality = video_quality
+        self.download_video_enabled = download_video
+        self.download_audio_enabled = download_audio
         self.thumbnail_loader = None
         self._is_completed = False
         self._countdown = 5
@@ -96,7 +100,10 @@ class DownloadWindow(QDialog):
     def setup_ui(self):
         """Initialize the user interface"""
         self.setWindowTitle("YouTube Downloader")
-        self.setFixedSize(500, 320)
+        # Use resize instead of setFixedSize to avoid Qt geometry warnings on Windows
+        self.resize(500, 320)
+        self.setMinimumSize(500, 320)
+        self.setMaximumSize(500, 400)  # Allow slight flexibility
         # Frameless window for clean look
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, False)
@@ -179,10 +186,11 @@ class DownloadWindow(QDialog):
         # Separator
         layout.addSpacing(8)
         
-        # Video progress section
-        video_section = QLabel("Video indiriliyor... (1080p MP4)")
-        video_section.setObjectName("sectionTitle")
-        layout.addWidget(video_section)
+        # Video progress section - dynamic label based on quality
+        quality_label = f"maks. {self.video_quality}p" if int(self.video_quality) < 1440 else f"maks. {self.video_quality}p AV1"
+        self.video_section = QLabel(f"Video indiriliyor... ({quality_label})")
+        self.video_section.setObjectName("sectionTitle")
+        layout.addWidget(self.video_section)
         
         self.video_status = QLabel("Hazırlanıyor...")
         self.video_status.setObjectName("statusLabel")

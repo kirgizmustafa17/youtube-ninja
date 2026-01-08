@@ -149,50 +149,89 @@ class YouTubeDownloader:
         if quality_int >= self.HIGH_RES_THRESHOLD:
             codec_preference = 'av01'  # AV1
             audio_codec = 'm4a'  # Better audio for high-res
-            quality_label = f"{video_quality}p AV1"
+            quality_label = f"maks. {video_quality}p AV1"
         else:
             codec_preference = 'avc'  # H.264
             audio_codec = 'mp4a'  # AAC
-            quality_label = f"{video_quality}p"
+            quality_label = f"maks. {video_quality}p"
+        
+        # Variable to store actual resolution once known
+        actual_resolution = [None]  # Use list to allow modification in nested function
         
         def progress_hook(d):
             if self._cancel_requested:
                 raise Exception("Download cancelled")
             
             if d['status'] == 'downloading':
+                # Try to get actual resolution from info
+                if actual_resolution[0] is None:
+                    info = d.get('info_dict', {})
+                    height = info.get('height') or info.get('resolution', '').split('x')[-1] if 'x' in str(info.get('resolution', '')) else None
+                    if height:
+                        try:
+                            actual_resolution[0] = f"{height}p"
+                        except:
+                            actual_resolution[0] = quality_label
+                    else:
+                        actual_resolution[0] = quality_label
+                
                 total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
                 downloaded = d.get('downloaded_bytes', 0)
                 if total > 0:
                     percent = (downloaded / total) * 100
                     speed = d.get('speed', 0)
                     speed_str = self._format_speed(speed) if speed else ''
+                    res_label = actual_resolution[0] or quality_label
                     if progress_callback:
-                        progress_callback('video', percent, f"İndiriliyor ({quality_label})... {speed_str}")
+                        progress_callback('video', percent, f"İndiriliyor ({res_label})... {speed_str}")
             elif d['status'] == 'finished':
                 if progress_callback:
                     progress_callback('video', 100, "Tamamlandı!")
         
-        # Build format string based on quality and codec
-        # For high-res: AV1 video + m4a audio, fallback to any codec
-        # For low-res: AVC video + AAC audio, fallback to any codec
+        # Build format string based on quality and codec with comprehensive fallbacks
+        # Priority order for high-res (1440p+): AV1 > VP9 > HEVC > AVC > any
+        # Priority order for low-res: AVC > VP9 > any
+        # Audio priority: OPUS > AAC > any
         if quality_int >= self.HIGH_RES_THRESHOLD:
             format_str = (
+                # First try: AV1 + OPUS (best for high-res)
                 f'bestvideo[height<={video_quality}][vcodec^=av01]+bestaudio[acodec^=opus]/'
+                # Fallback 1: AV1 + any audio
                 f'bestvideo[height<={video_quality}][vcodec^=av01]+bestaudio/'
+                # Fallback 2: VP9 + OPUS
+                f'bestvideo[height<={video_quality}][vcodec^=vp9]+bestaudio[acodec^=opus]/'
+                # Fallback 3: VP9 + any audio  
+                f'bestvideo[height<={video_quality}][vcodec^=vp9]+bestaudio/'
+                # Fallback 4: HEVC (H.265)
+                f'bestvideo[height<={video_quality}][vcodec^=hvc1]+bestaudio/'
+                f'bestvideo[height<={video_quality}][vcodec^=hev1]+bestaudio/'
+                # Fallback 5: AVC (H.264)
+                f'bestvideo[height<={video_quality}][vcodec^=avc]+bestaudio/'
+                # Final fallback: any codec
                 f'bestvideo[height<={video_quality}]+bestaudio/'
                 f'best[height<={video_quality}]'
             )
         else:
             format_str = (
+                # First try: AVC + AAC (best compatibility for low-res)
                 f'bestvideo[height<={video_quality}][vcodec^=avc]+bestaudio[acodec^=mp4a]/'
+                # Fallback 1: AVC + any audio
+                f'bestvideo[height<={video_quality}][vcodec^=avc]+bestaudio/'
+                # Fallback 2: VP9 + OPUS
+                f'bestvideo[height<={video_quality}][vcodec^=vp9]+bestaudio[acodec^=opus]/'
+                # Fallback 3: VP9 + any audio
+                f'bestvideo[height<={video_quality}][vcodec^=vp9]+bestaudio/'
+                # Fallback 4: AV1 (if available)
+                f'bestvideo[height<={video_quality}][vcodec^=av01]+bestaudio/'
+                # Final fallback: any codec
                 f'bestvideo[height<={video_quality}]+bestaudio/'
                 f'best[height<={video_quality}]'
             )
         
         ydl_opts = {
             'format': format_str,
-            'outtmpl': output_path,
-            'merge_output_format': 'mp4',
+            'outtmpl': output_path.replace('.mp4', '.%(ext)s'),  # Let yt-dlp decide extension
+            # Don't force mp4, let yt-dlp choose best container (mp4/mkv/webm)
             'progress_hooks': [progress_hook],
             'quiet': True,
             'no_warnings': True,

@@ -11,6 +11,7 @@ import platform
 import tarfile
 import zipfile
 import webbrowser
+import winsound
 import requests
 from pathlib import Path
 from typing import Optional
@@ -547,6 +548,12 @@ class YouTubeDownloaderApp:
                 if audio_success:
                     msg += "🎵 Audio: ~/Music"
                 
+                # Play success sound
+                try:
+                    winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                except:
+                    pass
+                
                 self.tray_icon.showMessage(
                     "İndirme Tamamlandı",
                     msg,
@@ -558,6 +565,13 @@ class YouTubeDownloaderApp:
                     self.current_window.video_info.get('title', 'Unknown'),
                     "Download failed"
                 )
+                
+                # Play error sound
+                try:
+                    winsound.PlaySound("SystemHand", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                except:
+                    pass
+                
                 self.tray_icon.showMessage(
                     "İndirme Başarısız",
                     "Video indirilemedi. Lütfen tekrar deneyin.",

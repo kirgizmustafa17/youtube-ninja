@@ -241,6 +241,9 @@ class YouTubeDownloaderApp:
         self.setup_tray_icon()
         self.setup_clipboard_monitor()
         
+        # Check for FFmpeg at startup
+        self._check_ffmpeg_startup()
+        
         # Handle Ctrl+C gracefully
         signal.signal(signal.SIGINT, self._signal_handler)
         
@@ -248,6 +251,31 @@ class YouTubeDownloaderApp:
         self.timer = QTimer()
         self.timer.timeout.connect(lambda: None)
         self.timer.start(500)
+    
+    def _check_ffmpeg_startup(self):
+        """Check if FFmpeg is available at startup"""
+        import shutil
+        app_dir = Path(__file__).parent.resolve()
+        
+        # Check in app directory first
+        ffmpeg_local = app_dir / ('ffmpeg.exe' if platform.system() == 'Windows' else 'ffmpeg')
+        
+        # Check in system PATH
+        ffmpeg_system = shutil.which('ffmpeg')
+        
+        if not ffmpeg_local.exists() and not ffmpeg_system:
+            # FFmpeg not found - ask user to download
+            reply = QMessageBox.question(
+                None,
+                "FFmpeg Bulunamadı",
+                "FFmpeg bulunamadı. Video işleme için FFmpeg gereklidir.\n\n"
+                "FFmpeg'i şimdi indirmek ister misiniz?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                # Trigger FFmpeg download after app starts
+                QTimer.singleShot(1000, self._download_ffmpeg)
     
     def setup_tray_icon(self):
         """Setup system tray icon and menu"""

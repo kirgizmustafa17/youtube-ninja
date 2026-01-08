@@ -29,6 +29,7 @@ from config_manager import get_config_manager, ConfigManager
 from logger import log_info, log_error, log_warning, log_download_start, log_download_complete, log_download_error
 from history import get_history_manager
 from queue_manager import DownloadQueue, QueueItem
+from updater import YtDlpUpdater, get_ytdlp_version, AppVersionManager
 
 
 class FFmpegDownloader(QThread):
@@ -383,6 +384,11 @@ class YouTubeDownloaderApp:
         ffmpeg_action.triggered.connect(self._download_ffmpeg)
         tray_menu.addAction(ffmpeg_action)
         
+        # Update yt-dlp action
+        update_action = QAction(f"🔄 yt-dlp Güncelle (v{get_ytdlp_version()})", self.app)
+        update_action.triggered.connect(self._update_ytdlp)
+        tray_menu.addAction(update_action)
+        
         tray_menu.addSeparator()
         
         # Donate button
@@ -706,6 +712,38 @@ class YouTubeDownloaderApp:
             QSystemTrayIcon.Information,
             2000
         )
+    
+    def _update_ytdlp(self):
+        """Update yt-dlp to latest version"""
+        self.tray_icon.showMessage(
+            "Güncelleme Başlatıldı",
+            "yt-dlp güncelleniyor...",
+            QSystemTrayIcon.Information,
+            2000
+        )
+        
+        self.ytdlp_updater = YtDlpUpdater()
+        self.ytdlp_updater.update_complete.connect(self._on_ytdlp_update_complete)
+        self.ytdlp_updater.start()
+    
+    def _on_ytdlp_update_complete(self, success: bool, message: str):
+        """Handle yt-dlp update completion"""
+        if success:
+            self.tray_icon.showMessage(
+                "Güncelleme Tamamlandı",
+                message,
+                QSystemTrayIcon.Information,
+                3000
+            )
+            log_info(f"yt-dlp updated: {message}")
+        else:
+            self.tray_icon.showMessage(
+                "Güncelleme Başarısız",
+                message,
+                QSystemTrayIcon.Critical,
+                3000
+            )
+            log_error(f"yt-dlp update failed: {message}")
     
     def _download_ffmpeg(self):
         """Download FFmpeg from GitHub"""

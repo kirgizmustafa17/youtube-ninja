@@ -117,16 +117,16 @@ class YouTubeDownloader:
         
         safe_title = self._sanitize_filename(info['title'])
         
-        # Download video if enabled
-        if download_video and not self._cancel_requested:
-            results['video'] = self._download_video_file(
-                url, safe_title, progress_callback, video_quality
-            )
-        
-        # Download audio (MP3) if enabled
+        # Download audio (MP3) first - it's faster
         if download_audio and not self._cancel_requested:
             results['audio'] = self._download_audio_file(
                 url, safe_title, progress_callback, audio_quality
+            )
+        
+        # Download video after audio
+        if download_video and not self._cancel_requested:
+            results['video'] = self._download_video_file(
+                url, safe_title, progress_callback, video_quality
             )
         
         return results

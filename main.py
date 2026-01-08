@@ -27,6 +27,7 @@ from downloader import YouTubeDownloader
 from ui.download_window import DownloadWindow
 from config_manager import get_config_manager, ConfigManager
 from logger import log_info, log_error, log_warning, log_download_start, log_download_complete, log_download_error
+from history import get_history_manager
 
 
 class FFmpegDownloader(QThread):
@@ -234,6 +235,9 @@ class YouTubeDownloaderApp:
         
         # Initialize config manager
         self.config = get_config_manager(Path(__file__).parent.resolve())
+        
+        # Initialize history manager
+        self.history = get_history_manager(Path(__file__).parent.resolve())
         
         self.downloader = YouTubeDownloader(
             videos_dir=self.config.output_video_dir,
@@ -542,6 +546,17 @@ class YouTubeDownloaderApp:
                     self.current_window.video_info.get('title', 'Unknown'),
                     video_success, audio_success
                 )
+                
+                # Save to history
+                self.history.add_download(
+                    url=self.current_window.video_info.get('url', ''),
+                    title=self.current_window.video_info.get('title', 'Unknown'),
+                    video_success=video_success,
+                    audio_success=audio_success,
+                    video_quality=self.config.video_quality,
+                    thumbnail=self.current_window.video_info.get('thumbnail', '')
+                )
+                
                 msg = "İndirme tamamlandı!\n"
                 if video_success:
                     msg += "📹 Video: ~/Videos\n"

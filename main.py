@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional
 from PyQt5.QtWidgets import (
     QApplication, QSystemTrayIcon, QMenu, QAction, QMessageBox,
-    QProgressDialog
+    QProgressDialog, QFileDialog
 )
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QDesktopServices
@@ -234,7 +234,10 @@ class YouTubeDownloaderApp:
         # Initialize config manager
         self.config = get_config_manager(Path(__file__).parent.resolve())
         
-        self.downloader = YouTubeDownloader()
+        self.downloader = YouTubeDownloader(
+            videos_dir=self.config.output_video_dir,
+            music_dir=self.config.output_audio_dir
+        )
         self.current_window: Optional[DownloadWindow] = None
         self.download_worker: Optional[DownloadWorker] = None
         self.processed_urls = set()  # Track processed URLs to avoid duplicates
@@ -341,6 +344,25 @@ class YouTubeDownloaderApp:
         music_action = QAction("🎵 Music klasörünü aç", self.app)
         music_action.triggered.connect(self._open_music_folder)
         tray_menu.addAction(music_action)
+        
+        # Folder settings submenu
+        folder_menu = QMenu("📂 Çıktı Klasörleri", tray_menu)
+        
+        change_video_folder = QAction("Video klasörünü değiştir...", self.app)
+        change_video_folder.triggered.connect(self._change_video_folder)
+        folder_menu.addAction(change_video_folder)
+        
+        change_audio_folder = QAction("Müzik klasörünü değiştir...", self.app)
+        change_audio_folder.triggered.connect(self._change_audio_folder)
+        folder_menu.addAction(change_audio_folder)
+        
+        folder_menu.addSeparator()
+        
+        reset_folders = QAction("Varsayılana sıfırla", self.app)
+        reset_folders.triggered.connect(self._reset_folders)
+        folder_menu.addAction(reset_folders)
+        
+        tray_menu.addMenu(folder_menu)
         
         tray_menu.addSeparator()
         
@@ -550,6 +572,55 @@ class YouTubeDownloaderApp:
     def _open_music_folder(self):
         """Open Music folder in file manager"""
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.downloader.music_dir)))
+    
+    def _change_video_folder(self):
+        """Change video output folder"""
+        folder = QFileDialog.getExistingDirectory(
+            None,
+            "Video Klasörü Seç",
+            str(self.config.output_video_dir)
+        )
+        if folder:
+            self.config.output_video_dir = folder
+            self.downloader.set_output_dirs(videos_dir=Path(folder))
+            self.tray_icon.showMessage(
+                "Klasör Değiştirildi",
+                f"Video klasörü: {folder}",
+                QSystemTrayIcon.Information,
+                2000
+            )
+    
+    def _change_audio_folder(self):
+        """Change audio output folder"""
+        folder = QFileDialog.getExistingDirectory(
+            None,
+            "Müzik Klasörü Seç",
+            str(self.config.output_audio_dir)
+        )
+        if folder:
+            self.config.output_audio_dir = folder
+            self.downloader.set_output_dirs(music_dir=Path(folder))
+            self.tray_icon.showMessage(
+                "Klasör Değiştirildi",
+                f"Müzik klasörü: {folder}",
+                QSystemTrayIcon.Information,
+                2000
+            )
+    
+    def _reset_folders(self):
+        """Reset folders to defaults"""
+        self.config.output_video_dir = ''
+        self.config.output_audio_dir = ''
+        self.downloader.set_output_dirs(
+            videos_dir=Path.home() / 'Videos',
+            music_dir=Path.home() / 'Music'
+        )
+        self.tray_icon.showMessage(
+            "Klasörler Sıfırlandı",
+            "Videos ve Music klasörleri varsayılana döndürüldü.",
+            QSystemTrayIcon.Information,
+            2000
+        )
     
     def _download_ffmpeg(self):
         """Download FFmpeg from GitHub"""

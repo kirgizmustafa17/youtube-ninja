@@ -28,16 +28,25 @@ class YouTubeDownloader:
     MAX_RETRIES = 3
     RETRY_DELAYS = [2, 5, 10]  # Seconds to wait between retries (exponential backoff)
     
-    def __init__(self):
+    def __init__(self, videos_dir: Path = None, music_dir: Path = None):
         self.home_dir = Path.home()
-        self.videos_dir = self.home_dir / "Videos"
-        self.music_dir = self.home_dir / "Music"
+        self.videos_dir = videos_dir or (self.home_dir / "Videos")
+        self.music_dir = music_dir or (self.home_dir / "Music")
         
         # Ensure directories exist
         self.videos_dir.mkdir(exist_ok=True)
         self.music_dir.mkdir(exist_ok=True)
         
         self._cancel_requested = False
+    
+    def set_output_dirs(self, videos_dir: Path = None, music_dir: Path = None):
+        """Update output directories"""
+        if videos_dir:
+            self.videos_dir = videos_dir
+            self.videos_dir.mkdir(exist_ok=True)
+        if music_dir:
+            self.music_dir = music_dir
+            self.music_dir.mkdir(exist_ok=True)
     
     def _retry_download(self, download_func, *args, **kwargs) -> bool:
         """

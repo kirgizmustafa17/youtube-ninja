@@ -15,6 +15,8 @@ DEFAULT_CONFIG = {
     'video_quality': '1080',
     'audio_quality': '0',  # '0' = best
     'donate_url': 'https://buymeacoffee.com/',
+    'output_video_dir': '',  # Empty = ~/Videos
+    'output_audio_dir': '',  # Empty = ~/Music
 }
 
 
@@ -112,6 +114,28 @@ class ConfigManager:
     @property
     def donate_url(self) -> str:
         return self.get('donate_url', 'https://buymeacoffee.com/')
+    
+    @property
+    def output_video_dir(self) -> Path:
+        custom = self.get('output_video_dir', '')
+        if custom:
+            return Path(custom)
+        return Path.home() / 'Videos'
+    
+    @output_video_dir.setter
+    def output_video_dir(self, value):
+        self.set('output_video_dir', str(value) if value else '')
+    
+    @property
+    def output_audio_dir(self) -> Path:
+        custom = self.get('output_audio_dir', '')
+        if custom:
+            return Path(custom)
+        return Path.home() / 'Music'
+    
+    @output_audio_dir.setter
+    def output_audio_dir(self, value):
+        self.set('output_audio_dir', str(value) if value else '')
     
     @staticmethod
     def get_available_qualities() -> list:

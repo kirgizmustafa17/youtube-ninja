@@ -4,3 +4,10 @@ __pycache__/
 config.json
 ffmpeg*
 ffprobe*
+history.json
+logs/
+
+# PyInstaller
+build/
+dist/
+*.spec

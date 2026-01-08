@@ -28,6 +28,7 @@ from ui.download_window import DownloadWindow
 from config_manager import get_config_manager, ConfigManager
 from logger import log_info, log_error, log_warning, log_download_start, log_download_complete, log_download_error
 from history import get_history_manager
+from queue_manager import DownloadQueue, QueueItem
 
 
 class FFmpegDownloader(QThread):
@@ -246,6 +247,13 @@ class YouTubeDownloaderApp:
         self.current_window: Optional[DownloadWindow] = None
         self.download_worker: Optional[DownloadWorker] = None
         self.processed_urls = set()  # Track processed URLs to avoid duplicates
+        
+        # Initialize download queue
+        self.download_queue = DownloadQueue()
+        self.download_queue.set_callbacks(
+            on_next=self._on_queue_next,
+            on_queue_empty=self._on_queue_empty
+        )
         
         self.setup_tray_icon()
         self.setup_clipboard_monitor()
@@ -478,35 +486,77 @@ class YouTubeDownloaderApp:
             self.processed_urls.discard(url)
             return
         
-        # Show download window
-        self._start_download(url, video_info)
+        # Add URL to video_info for history
+        video_info['url'] = url
+        
+        # Add to download queue
+        position = self.download_queue.add_url(
+            url=url,
+            video_info=video_info,
+            download_video=self.config.download_video,
+            download_audio=self.config.download_mp3,
+            video_quality=self.config.video_quality,
+            audio_quality=self.config.audio_quality
+        )
+        
+        if position > 0:
+            self.tray_icon.showMessage(
+                "Kuyruğa Eklendi",
+                f"{video_info['title'][:50]}... (Sıra: {position + 1})",
+                QSystemTrayIcon.Information,
+                2000
+            )
     
-    def _start_download(self, url: str, video_info: dict):
+    def _on_queue_next(self, item: QueueItem):
+        """Handle next item in queue - start download"""
+        self._start_download(item.url, item.video_info, item)
+    
+    def _on_queue_empty(self):
+        """Handle queue empty"""
+        log_info("Download queue empty")
+    
+    def _start_download(self, url: str, video_info: dict, queue_item: QueueItem = None):
         """Start the download process"""
+        # Use queue item settings if provided, otherwise use config
+        download_video = queue_item.download_video if queue_item else self.config.download_video
+        download_audio = queue_item.download_audio if queue_item else self.config.download_mp3
+        video_quality = queue_item.video_quality if queue_item else self.config.video_quality
+        audio_quality = queue_item.audio_quality if queue_item else self.config.audio_quality
+        
+        # Store current video info for history
+        self._current_url = url
+        self._current_video_info = video_info
+        
         self.current_window = DownloadWindow(
             video_info,
-            video_quality=self.config.video_quality,
-            download_video=self.config.download_video,
-            download_audio=self.config.download_mp3
+            video_quality=video_quality,
+            download_video=download_video,
+            download_audio=download_audio
         )
         self.current_window.download_cancelled.connect(self._on_download_cancelled)
         
         # Update window labels based on options
-        if not self.config.download_video:
+        if not download_video:
             self.current_window.video_status.setText("Devre dışı")
             self.current_window.video_status.setStyleSheet("color: #888888;")
-        if not self.config.download_mp3:
+        if not download_audio:
             self.current_window.audio_status.setText("Devre dışı")
             self.current_window.audio_status.setStyleSheet("color: #888888;")
+        
+        # Show queue count if more in queue
+        if self.download_queue.pending_count > 0:
+            self.current_window.setWindowTitle(
+                f"YouTube Downloader - {self.download_queue.pending_count} bekliyor"
+            )
         
         # Create download worker with options
         self.download_worker = DownloadWorker(
             url, 
             self.downloader,
-            download_video=self.config.download_video,
-            download_audio=self.config.download_mp3,
-            video_quality=self.config.video_quality,
-            audio_quality=self.config.audio_quality
+            download_video=download_video,
+            download_audio=download_audio,
+            video_quality=video_quality,
+            audio_quality=audio_quality
         )
         self.download_worker.progress_update.connect(self.current_window.update_progress)
         self.download_worker.download_complete.connect(self._on_download_complete)
@@ -527,6 +577,9 @@ class YouTubeDownloaderApp:
             QSystemTrayIcon.Warning,
             2000
         )
+        
+        # Process next item in queue
+        self.download_queue.cancel_current()
     
     def _on_download_complete(self, results: dict):
         """Handle download completion"""
@@ -593,6 +646,9 @@ class YouTubeDownloaderApp:
                     QSystemTrayIcon.Critical,
                     3000
                 )
+        
+        # Process next item in queue
+        self.download_queue.complete_current()
     
     def _open_videos_folder(self):
         """Open Videos folder in file manager"""

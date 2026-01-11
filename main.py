@@ -161,6 +161,30 @@ class ClipboardMonitor(QThread):
         self.wait(2000)
 
 
+class VideoInfoWorker(QThread):
+    """Worker thread for fetching video info asynchronously"""
+    
+    info_ready = pyqtSignal(str, dict)  # url, video_info
+    info_failed = pyqtSignal(str, str)  # url, error_message
+    
+    def __init__(self, url: str, downloader: YouTubeDownloader):
+        super().__init__()
+        self.url = url
+        self.downloader = downloader
+    
+    def run(self):
+        """Fetch video info in background"""
+        try:
+            info = self.downloader.get_video_info(self.url)
+            if info:
+                info['url'] = self.url
+                self.info_ready.emit(self.url, info)
+            else:
+                self.info_failed.emit(self.url, "Video bilgileri alınamadı")
+        except Exception as e:
+            self.info_failed.emit(self.url, str(e))
+
+
 class DownloadWorker(QThread):
     """Worker thread for downloading videos"""
     
@@ -256,6 +280,9 @@ class YouTubeDownloaderApp:
             on_next=self._on_queue_next,
             on_queue_empty=self._on_queue_empty
         )
+        
+        # Track pending video info fetches
+        self.pending_info_workers = {}
         
         self.setup_tray_icon()
         self.setup_clipboard_monitor()
@@ -449,19 +476,9 @@ class YouTubeDownloaderApp:
         if url in self.processed_urls:
             return
         
-        # Skip if a download is in progress
-        if self.current_window is not None and self.current_window.isVisible():
-            self.tray_icon.showMessage(
-                "İndirme Devam Ediyor",
-                "Zaten bir indirme işlemi devam ediyor.",
-                QSystemTrayIcon.Warning,
-                2000
-            )
-            return
-        
         self.processed_urls.add(url)
         
-        # Get video info
+        # Show notification
         self.tray_icon.showMessage(
             "YouTube Linki Algılandı",
             "Video bilgileri alınıyor...",
@@ -469,19 +486,18 @@ class YouTubeDownloaderApp:
             2000
         )
         
-        video_info = self.downloader.get_video_info(url)
-        if not video_info:
-            self.tray_icon.showMessage(
-                "Hata",
-                "Video bilgileri alınamadı.",
-                QSystemTrayIcon.Critical,
-                3000
-            )
-            self.processed_urls.discard(url)
-            return
-        
-        # Add URL to video_info for history
-        video_info['url'] = url
+        # Fetch video info asynchronously
+        worker = VideoInfoWorker(url, self.downloader)
+        worker.info_ready.connect(self._on_video_info_ready)
+        worker.info_failed.connect(self._on_video_info_failed)
+        self.pending_info_workers[url] = worker
+        worker.start()
+    
+    def _on_video_info_ready(self, url: str, video_info: dict):
+        """Handle successful video info fetch"""
+        # Clean up worker
+        if url in self.pending_info_workers:
+            del self.pending_info_workers[url]
         
         # Add to download queue
         position = self.download_queue.add_url(
@@ -500,6 +516,20 @@ class YouTubeDownloaderApp:
                 QSystemTrayIcon.Information,
                 2000
             )
+    
+    def _on_video_info_failed(self, url: str, error: str):
+        """Handle failed video info fetch"""
+        # Clean up worker
+        if url in self.pending_info_workers:
+            del self.pending_info_workers[url]
+        
+        self.processed_urls.discard(url)
+        self.tray_icon.showMessage(
+            "Hata",
+            f"Video bilgileri alınamadı: {error[:50]}",
+            QSystemTrayIcon.Critical,
+            3000
+        )
     
     def _on_queue_next(self, item: QueueItem):
         """Handle next item in queue - start download"""

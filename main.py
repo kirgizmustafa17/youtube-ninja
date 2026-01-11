@@ -147,6 +147,10 @@ class ClipboardMonitor(QThread):
                 if current_text and current_text != self.last_text:
                     self.last_text = current_text
                     
+                    # Debug: print full clipboard text
+                    if 'youtube' in current_text.lower():
+                        print(f"[DEBUG] Clipboard text (len={len(current_text)}): {current_text}")
+                    
                     # Check for playlist first (playlist URLs also match video pattern)
                     if self.downloader.is_playlist_url(current_text):
                         self.playlist_url_detected.emit(current_text)
@@ -204,7 +208,7 @@ class PlaylistInfoWorker(QThread):
         super().__init__()
         self.url = url
         self.downloader = downloader
-        print(f"[DEBUG] PlaylistInfoWorker created for: {url[:50]}")
+        print(f"[DEBUG] PlaylistInfoWorker created for: {url}")
     
     def run(self):
         """Fetch playlist info in background"""
@@ -618,7 +622,7 @@ class YouTubeDownloaderApp:
     
     def _on_playlist_url_detected(self, url: str):
         """Handle detected YouTube playlist URL"""
-        print(f"[DEBUG] _on_playlist_url_detected: {url[:50]}")
+        print(f"[DEBUG] _on_playlist_url_detected: {url}")
         
         # Skip if already processing this URL
         if url in self.processed_urls:

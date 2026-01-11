@@ -95,14 +95,24 @@ class YouTubeDownloader:
         """Check if the given text is a valid YouTube URL"""
         if not text:
             return False
-        return bool(cls.YOUTUBE_URL_PATTERN.match(text.strip()))
+        text = text.strip().lower()
+        # Simple check for YouTube domains
+        return any(domain in text for domain in [
+            'youtube.com/watch',
+            'youtube.com/shorts',
+            'youtu.be/',
+            'youtube.com/playlist',
+            'music.youtube.com/watch'
+        ])
     
     @classmethod
     def is_playlist_url(cls, text: str) -> bool:
         """Check if the given text is a YouTube playlist URL"""
         if not text:
             return False
-        return bool(cls.PLAYLIST_URL_PATTERN.match(text.strip()))
+        text_lower = text.strip().lower()
+        # Check for playlist indicators
+        return ('youtube.com' in text_lower and 'list=' in text_lower)
     
     @classmethod
     def extract_video_id(cls, url: str) -> Optional[str]:
@@ -126,7 +136,7 @@ class YouTubeDownloader:
     
     def get_playlist_info(self, url: str) -> Optional[Dict[str, Any]]:
         """Fetch playlist metadata and video list"""
-        print(f"[DEBUG] get_playlist_info() called for: {url[:50]}")
+        print(f"[DEBUG] get_playlist_info() called for: {url}")
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,

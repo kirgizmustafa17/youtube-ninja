@@ -381,24 +381,6 @@ class YouTubeDownloaderApp:
         
         tray_menu.addSeparator()
         
-        ffmpeg_action = QAction("⬇️ FFmpeg İndir", self.app)
-        ffmpeg_action.triggered.connect(self._download_ffmpeg)
-        tray_menu.addAction(ffmpeg_action)
-        
-        # Update yt-dlp action
-        update_action = QAction(f"🔄 yt-dlp Güncelle (v{get_ytdlp_version()})", self.app)
-        update_action.triggered.connect(self._update_ytdlp)
-        tray_menu.addAction(update_action)
-        
-        tray_menu.addSeparator()
-        
-        # Donate button
-        donate_action = QAction("☕ Bağış Yap (Buy Me a Coffee)", self.app)
-        donate_action.triggered.connect(self._open_donate)
-        tray_menu.addAction(donate_action)
-        
-        tray_menu.addSeparator()
-        
         # About button
         about_action = QAction("ℹ️ Hakkında", self.app)
         about_action.triggered.connect(self._show_about)

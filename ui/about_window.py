@@ -35,7 +35,7 @@ class AboutWindow(QDialog):
     def setup_ui(self):
         """Initialize the user interface"""
         self.setWindowTitle("Hakkında")
-        self.setFixedSize(380, 420)
+        self.setFixedSize(450, 420)
         self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
         
         layout = QVBoxLayout(self)

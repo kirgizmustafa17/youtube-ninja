@@ -25,6 +25,7 @@ from PyQt5.QtCore import QUrl
 
 from downloader import YouTubeDownloader
 from ui.download_window import DownloadWindow
+from ui.about_window import AboutWindow
 from config_manager import get_config_manager, ConfigManager
 from logger import log_info, log_error, log_warning, log_download_start, log_download_complete, log_download_error
 from history import get_history_manager
@@ -398,6 +399,11 @@ class YouTubeDownloaderApp:
         
         tray_menu.addSeparator()
         
+        # About button
+        about_action = QAction("ℹ️ Hakkında", self.app)
+        about_action.triggered.connect(self._show_about)
+        tray_menu.addAction(about_action)
+        
         quit_action = QAction("❌ Çıkış", self.app)
         quit_action.triggered.connect(self.quit)
         tray_menu.addAction(quit_action)
@@ -712,6 +718,32 @@ class YouTubeDownloaderApp:
             QSystemTrayIcon.Information,
             2000
         )
+    
+    def _show_about(self):
+        """Show the About window"""
+        import shutil
+        
+        # Check FFmpeg status
+        app_dir = Path(__file__).parent.resolve()
+        ffmpeg_local = app_dir / ('ffmpeg.exe' if platform.system() == 'Windows' else 'ffmpeg')
+        ffmpeg_installed = ffmpeg_local.exists() or shutil.which('ffmpeg') is not None
+        
+        # Get download count from history
+        download_count = len(self.history.history)
+        
+        self.about_window = AboutWindow(
+            app_version=AppVersionManager.get_app_version(),
+            ytdlp_version=get_ytdlp_version(),
+            download_count=download_count,
+            ffmpeg_installed=ffmpeg_installed
+        )
+        
+        # Connect signals
+        self.about_window.update_clicked.connect(self._update_ytdlp)
+        self.about_window.donate_clicked.connect(self._open_donate)
+        self.about_window.ffmpeg_clicked.connect(self._download_ffmpeg)
+        
+        self.about_window.show()
     
     def _update_ytdlp(self):
         """Update yt-dlp to latest version"""

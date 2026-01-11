@@ -91,7 +91,7 @@ def check_ytdlp_update() -> Tuple[bool, str, str]:
 class AppVersionManager:
     """Manages application version and update checking"""
     
-    APP_VERSION = "3.9"  # Current app version
+    APP_VERSION = "1.0.0"  # Semantic Versioning: MAJOR.MINOR.PATCH
     
     @classmethod
     def get_app_version(cls) -> str:

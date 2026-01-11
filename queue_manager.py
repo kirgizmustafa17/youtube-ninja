@@ -17,6 +17,8 @@ class QueueItem:
     download_audio: bool = True
     video_quality: str = '1080'
     audio_quality: str = '0'
+    playlist_name: str = None  # For subdirectory
+    playlist_position: str = None  # e.g. "3/10"
 
 
 class DownloadQueue:
@@ -83,7 +85,9 @@ class DownloadQueue:
         download_video: bool = True,
         download_audio: bool = True,
         video_quality: str = '1080',
-        audio_quality: str = '0'
+        audio_quality: str = '0',
+        playlist_name: str = None,
+        playlist_position: str = None
     ) -> int:
         """Convenience method to add URL to queue"""
         item = QueueItem(
@@ -92,7 +96,9 @@ class DownloadQueue:
             download_video=download_video,
             download_audio=download_audio,
             video_quality=video_quality,
-            audio_quality=audio_quality
+            audio_quality=audio_quality,
+            playlist_name=playlist_name,
+            playlist_position=playlist_position
         )
         return self.add(item)
     

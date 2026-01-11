@@ -128,6 +128,7 @@ class ClipboardMonitor(QThread):
     """Thread to monitor clipboard for YouTube URLs"""
     
     youtube_url_detected = pyqtSignal(str)
+    playlist_url_detected = pyqtSignal(str)  # New signal for playlists
     
     def __init__(self, clipboard):
         super().__init__()
@@ -142,13 +143,15 @@ class ClipboardMonitor(QThread):
             try:
                 current_text = self.clipboard.text().strip()
                 
-                # Check if text changed and is a YouTube URL
+                # Check if text changed
                 if current_text and current_text != self.last_text:
-                    if self.downloader.is_youtube_url(current_text):
-                        self.last_text = current_text
+                    self.last_text = current_text
+                    
+                    # Check for playlist first (playlist URLs also match video pattern)
+                    if self.downloader.is_playlist_url(current_text):
+                        self.playlist_url_detected.emit(current_text)
+                    elif self.downloader.is_youtube_url(current_text):
                         self.youtube_url_detected.emit(current_text)
-                    else:
-                        self.last_text = current_text
                 
                 self.msleep(500)  # Check every 500ms
             except Exception as e:
@@ -191,6 +194,34 @@ class VideoInfoWorker(QThread):
             self.info_failed.emit(self.url, str(e))
 
 
+class PlaylistInfoWorker(QThread):
+    """Worker thread for fetching playlist info asynchronously"""
+    
+    playlist_ready = pyqtSignal(str, dict)  # url, playlist_info
+    playlist_failed = pyqtSignal(str, str)  # url, error_message
+    
+    def __init__(self, url: str, downloader: YouTubeDownloader):
+        super().__init__()
+        self.url = url
+        self.downloader = downloader
+        print(f"[DEBUG] PlaylistInfoWorker created for: {url[:50]}")
+    
+    def run(self):
+        """Fetch playlist info in background"""
+        print(f"[DEBUG] PlaylistInfoWorker.run() started")
+        try:
+            info = self.downloader.get_playlist_info(self.url)
+            if info:
+                print(f"[DEBUG] Playlist: {info['title']} - {info['video_count']} videos")
+                self.playlist_ready.emit(self.url, info)
+            else:
+                self.playlist_failed.emit(self.url, "Playlist bilgileri alınamadı")
+        except Exception as e:
+            print(f"[DEBUG] PlaylistInfoWorker exception: {e}")
+            self.playlist_failed.emit(self.url, str(e))
+
+
+
 class DownloadWorker(QThread):
     """Worker thread for downloading videos"""
     
@@ -200,7 +231,7 @@ class DownloadWorker(QThread):
     def __init__(self, url: str, downloader: YouTubeDownloader, 
                  download_video: bool = True, download_audio: bool = True,
                  video_quality: str = '1080', audio_quality: str = '0',
-                 video_info: dict = None):
+                 video_info: dict = None, playlist_name: str = None):
         super().__init__()
         self.url = url
         self.downloader = downloader
@@ -209,6 +240,7 @@ class DownloadWorker(QThread):
         self.video_quality = video_quality
         self.audio_quality = audio_quality
         self.video_info = video_info
+        self.playlist_name = playlist_name
     
     def run(self):
         """Execute the download"""
@@ -220,7 +252,8 @@ class DownloadWorker(QThread):
             download_audio=self.download_audio,
             video_quality=self.video_quality,
             audio_quality=self.audio_quality,
-            video_info=self.video_info
+            video_info=self.video_info,
+            playlist_name=self.playlist_name
         )
         print(f"[DEBUG] DownloadWorker.run() complete, results: {results}")
         self.download_complete.emit(results)
@@ -481,6 +514,7 @@ class YouTubeDownloaderApp:
         clipboard = self.app.clipboard()
         self.monitor = ClipboardMonitor(clipboard)
         self.monitor.youtube_url_detected.connect(self._on_youtube_url_detected)
+        self.monitor.playlist_url_detected.connect(self._on_playlist_url_detected)
         self.monitor.start()
     
     def _on_youtube_url_detected(self, url: str):
@@ -582,6 +616,85 @@ class YouTubeDownloaderApp:
         # Process next URL in queue
         self._process_next_url()
     
+    def _on_playlist_url_detected(self, url: str):
+        """Handle detected YouTube playlist URL"""
+        print(f"[DEBUG] _on_playlist_url_detected: {url[:50]}")
+        
+        # Skip if already processing this URL
+        if url in self.processed_urls:
+            return
+        
+        self.processed_urls.add(url)
+        
+        # Show notification
+        self.tray_icon.showMessage(
+            "Playlist Algılandı",
+            "Playlist bilgileri alınıyor...",
+            QSystemTrayIcon.Information,
+            2000
+        )
+        
+        # Fetch playlist info asynchronously
+        worker = PlaylistInfoWorker(url, self.downloader)
+        worker.playlist_ready.connect(self._on_playlist_ready)
+        worker.playlist_failed.connect(self._on_playlist_failed)
+        worker.start()
+        # Store reference to prevent garbage collection
+        self._playlist_worker = worker
+    
+    def _on_playlist_ready(self, url: str, playlist_info: dict):
+        """Handle successful playlist info fetch"""
+        print(f"[DEBUG] _on_playlist_ready: {playlist_info['title']} - {playlist_info['video_count']} videos")
+        
+        playlist_name = playlist_info['title']
+        videos = playlist_info['videos']
+        total = len(videos)
+        
+        self.tray_icon.showMessage(
+            f"Playlist: {playlist_name[:30]}",
+            f"{total} video kuyruğa ekleniyor...",
+            QSystemTrayIcon.Information,
+            3000
+        )
+        
+        # Add each video to queue with playlist info
+        for i, video in enumerate(videos, 1):
+            video_url = video['url']
+            video_info = {
+                'title': video['title'],
+                'url': video_url,
+                'thumbnail': '',
+                'duration': 0,
+                'uploader': '',
+                'view_count': 0,
+            }
+            
+            self.download_queue.add_url(
+                url=video_url,
+                video_info=video_info,
+                download_video=self.config.download_video,
+                download_audio=self.config.download_mp3,
+                video_quality=self.config.video_quality,
+                audio_quality=self.config.audio_quality,
+                playlist_name=playlist_name,
+                playlist_position=f"{i}/{total}"
+            )
+            
+            # Mark as processed
+            self.processed_urls.add(video_url)
+        
+        print(f"[DEBUG] Added {total} videos from playlist to queue")
+    
+    def _on_playlist_failed(self, url: str, error: str):
+        """Handle failed playlist info fetch"""
+        self.processed_urls.discard(url)
+        self.tray_icon.showMessage(
+            "Playlist Hatası",
+            f"Playlist bilgileri alınamadı: {error[:50]}",
+            QSystemTrayIcon.Critical,
+            3000
+        )
+    
     def _on_queue_next(self, item: QueueItem):
         """Handle next item in queue - start download"""
         print(f"[DEBUG] _on_queue_next: {item.video_info.get('title', 'Unknown')[:30]}")
@@ -599,6 +712,8 @@ class YouTubeDownloaderApp:
         download_audio = queue_item.download_audio if queue_item else self.config.download_mp3
         video_quality = queue_item.video_quality if queue_item else self.config.video_quality
         audio_quality = queue_item.audio_quality if queue_item else self.config.audio_quality
+        playlist_name = queue_item.playlist_name if queue_item else None
+        playlist_position = queue_item.playlist_position if queue_item else None
         
         # Store current video info for history
         self._current_url = url
@@ -620,8 +735,12 @@ class YouTubeDownloaderApp:
             self.current_window.audio_status.setText("Devre dışı")
             self.current_window.audio_status.setStyleSheet("color: #888888;")
         
-        # Show queue count if more in queue
-        if self.download_queue.pending_count > 0:
+        # Update window title with playlist info or queue count
+        if playlist_position:
+            self.current_window.setWindowTitle(
+                f"YouTube Downloader - [{playlist_position}] {playlist_name[:20] if playlist_name else ''}"
+            )
+        elif self.download_queue.pending_count > 0:
             self.current_window.setWindowTitle(
                 f"YouTube Downloader - {self.download_queue.pending_count} bekliyor"
             )
@@ -634,7 +753,8 @@ class YouTubeDownloaderApp:
             download_audio=download_audio,
             video_quality=video_quality,
             audio_quality=audio_quality,
-            video_info=video_info
+            video_info=video_info,
+            playlist_name=playlist_name
         )
         self.download_worker.progress_update.connect(self.current_window.update_progress)
         self.download_worker.download_complete.connect(self._on_download_complete)

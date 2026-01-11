@@ -19,6 +19,10 @@ class YouTubeDownloader:
         r'(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/|music\.youtube\.com/watch\?v=)[\w-]+'
     )
     
+    PLAYLIST_URL_PATTERN = re.compile(
+        r'(https?://)?(www\.)?youtube\.com/(playlist\?list=|watch\?.*list=)[\w-]+'
+    )
+    
     # Quality thresholds for codec selection
     # 1080p and below: AVC (H.264) + AAC for maximum compatibility
     # 1440p and above: AV1 + m4a (OPUS) for better quality at high resolutions
@@ -92,6 +96,13 @@ class YouTubeDownloader:
         return bool(cls.YOUTUBE_URL_PATTERN.match(text.strip()))
     
     @classmethod
+    def is_playlist_url(cls, text: str) -> bool:
+        """Check if the given text is a YouTube playlist URL"""
+        if not text:
+            return False
+        return bool(cls.PLAYLIST_URL_PATTERN.match(text.strip()))
+    
+    @classmethod
     def extract_video_id(cls, url: str) -> Optional[str]:
         """Extract video ID from YouTube URL"""
         patterns = [
@@ -103,6 +114,44 @@ class YouTubeDownloader:
             match = re.search(pattern, url)
             if match:
                 return match.group(1)
+        return None
+    
+    @classmethod
+    def extract_playlist_id(cls, url: str) -> Optional[str]:
+        """Extract playlist ID from YouTube URL"""
+        match = re.search(r'list=([\w-]+)', url)
+        return match.group(1) if match else None
+    
+    def get_playlist_info(self, url: str) -> Optional[Dict[str, Any]]:
+        """Fetch playlist metadata and video list"""
+        print(f"[DEBUG] get_playlist_info() called for: {url[:50]}")
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,  # Don't download, just get playlist info
+            'socket_timeout': 15,
+        }
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if info and info.get('_type') == 'playlist':
+                    videos = []
+                    for entry in info.get('entries', []):
+                        if entry:
+                            videos.append({
+                                'url': f"https://www.youtube.com/watch?v={entry.get('id', '')}",
+                                'title': entry.get('title', 'Unknown'),
+                                'id': entry.get('id', ''),
+                            })
+                    return {
+                        'title': info.get('title', 'Playlist'),
+                        'id': info.get('id', ''),
+                        'video_count': len(videos),
+                        'videos': videos,
+                    }
+        except Exception as e:
+            print(f"[DEBUG] get_playlist_info exception: {e}")
         return None
     
     def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
@@ -146,7 +195,8 @@ class YouTubeDownloader:
         download_audio: bool = True,
         video_quality: str = '1080',
         audio_quality: str = '0',
-        video_info: Optional[Dict[str, Any]] = None
+        video_info: Optional[Dict[str, Any]] = None,
+        playlist_name: Optional[str] = None
     ) -> Dict[str, bool]:
         """
         Download video and/or audio based on options
@@ -162,6 +212,7 @@ class YouTubeDownloader:
             video_quality: Video quality ('360', '480', '720', '1080', '1440', '2160', '4320')
             audio_quality: Audio quality ('0' = best, '1' = good)
             video_info: Pre-fetched video info (optional, avoids extra API call)
+            playlist_name: Optional playlist name for subdirectory
         
         Returns:
             Dict with 'video' and 'audio' success status
@@ -176,18 +227,29 @@ class YouTubeDownloader:
         
         safe_title = self._sanitize_filename(info['title'])
         
+        # Determine output directories (with optional playlist subdirectory)
+        videos_output = self.videos_dir
+        music_output = self.music_dir
+        
+        if playlist_name:
+            safe_playlist = self._sanitize_filename(playlist_name)
+            videos_output = self.videos_dir / safe_playlist
+            music_output = self.music_dir / safe_playlist
+            videos_output.mkdir(exist_ok=True)
+            music_output.mkdir(exist_ok=True)
+        
         # Download audio (MP3) first - it's faster, with retry
         if download_audio and not self._cancel_requested:
             results['audio'] = self._retry_download(
                 self._download_audio_file,
-                url, safe_title, progress_callback, audio_quality
+                url, safe_title, progress_callback, audio_quality, music_output
             )
         
         # Download video after audio, with retry
         if download_video and not self._cancel_requested:
             results['video'] = self._retry_download(
                 self._download_video_file,
-                url, safe_title, progress_callback, video_quality
+                url, safe_title, progress_callback, video_quality, videos_output
             )
         
         return results
@@ -197,11 +259,13 @@ class YouTubeDownloader:
         url: str,
         safe_title: str,
         progress_callback: Optional[Callable],
-        video_quality: str = '1080'
+        video_quality: str = '1080',
+        output_dir: Path = None
     ) -> bool:
         """Download video in specified quality with appropriate codec"""
         
-        output_path = str(self.videos_dir / f"{safe_title}.mp4")
+        target_dir = output_dir or self.videos_dir
+        output_path = str(target_dir / f"{safe_title}.mp4")
         quality_int = int(video_quality)
         
         # Determine codec based on quality
@@ -326,11 +390,13 @@ class YouTubeDownloader:
         url: str,
         safe_title: str,
         progress_callback: Optional[Callable],
-        audio_quality: str = '0'
+        audio_quality: str = '0',
+        output_dir: Path = None
     ) -> bool:
         """Download best audio and convert to MP3"""
         
-        output_template = str(self.music_dir / f"{safe_title}.%(ext)s")
+        target_dir = output_dir or self.music_dir
+        output_template = str(target_dir / f"{safe_title}.%(ext)s")
         quality_label = "En İyi" if audio_quality == '0' else "Normal"
         
         def progress_hook(d):

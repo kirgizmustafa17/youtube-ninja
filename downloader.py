@@ -15,12 +15,14 @@ from typing import Callable, Optional, Dict, Any
 class YouTubeDownloader:
     """Wrapper class for yt-dlp to download YouTube videos"""
     
+    # Pattern for single videos (no list parameter or we'll check separately)
     YOUTUBE_URL_PATTERN = re.compile(
-        r'(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/|music\.youtube\.com/watch\?v=)[\w-]+'
+        r'(https?://)?(www\.)?(youtube\.com/watch\?[^\s]+|youtu\.be/[\w-]+|youtube\.com/shorts/[\w-]+|music\.youtube\.com/watch\?[^\s]+)'
     )
     
+    # Pattern for playlists - captures full list= parameter
     PLAYLIST_URL_PATTERN = re.compile(
-        r'(https?://)?(www\.)?youtube\.com/(playlist\?list=|watch\?.*list=)[\w-]+'
+        r'(https?://)?(www\.)?youtube\.com/(playlist\?list=[\w-]+|watch\?[^\s]*list=[\w-]+)'
     )
     
     # Quality thresholds for codec selection

@@ -171,17 +171,23 @@ class VideoInfoWorker(QThread):
         super().__init__()
         self.url = url
         self.downloader = downloader
+        print(f"[DEBUG] VideoInfoWorker created for: {url[:50]}")
     
     def run(self):
         """Fetch video info in background"""
+        print(f"[DEBUG] VideoInfoWorker.run() started for: {self.url[:50]}")
         try:
             info = self.downloader.get_video_info(self.url)
+            print(f"[DEBUG] get_video_info returned: {info is not None}")
             if info:
                 info['url'] = self.url
+                print(f"[DEBUG] Emitting info_ready for: {info.get('title', 'Unknown')[:30]}")
                 self.info_ready.emit(self.url, info)
             else:
+                print(f"[DEBUG] Emitting info_failed - no info")
                 self.info_failed.emit(self.url, "Video bilgileri alınamadı")
         except Exception as e:
+            print(f"[DEBUG] VideoInfoWorker exception: {e}")
             self.info_failed.emit(self.url, str(e))
 
 
@@ -472,11 +478,15 @@ class YouTubeDownloaderApp:
     
     def _on_youtube_url_detected(self, url: str):
         """Handle detected YouTube URL"""
+        print(f"[DEBUG] _on_youtube_url_detected: {url[:50]}")
+        
         # Skip if already processing this URL
         if url in self.processed_urls:
+            print(f"[DEBUG] URL already processed, skipping")
             return
         
         self.processed_urls.add(url)
+        print(f"[DEBUG] URL added to processed_urls, count: {len(self.processed_urls)}")
         
         # Show notification
         self.tray_icon.showMessage(
@@ -491,10 +501,13 @@ class YouTubeDownloaderApp:
         worker.info_ready.connect(self._on_video_info_ready)
         worker.info_failed.connect(self._on_video_info_failed)
         self.pending_info_workers[url] = worker
+        print(f"[DEBUG] Starting VideoInfoWorker, pending count: {len(self.pending_info_workers)}")
         worker.start()
     
     def _on_video_info_ready(self, url: str, video_info: dict):
         """Handle successful video info fetch"""
+        print(f"[DEBUG] _on_video_info_ready: {video_info.get('title', 'Unknown')[:30]}")
+        
         # Clean up worker
         if url in self.pending_info_workers:
             del self.pending_info_workers[url]
@@ -533,10 +546,12 @@ class YouTubeDownloaderApp:
     
     def _on_queue_next(self, item: QueueItem):
         """Handle next item in queue - start download"""
+        print(f"[DEBUG] _on_queue_next: {item.video_info.get('title', 'Unknown')[:30]}")
         self._start_download(item.url, item.video_info, item)
     
     def _on_queue_empty(self):
         """Handle queue empty"""
+        print("[DEBUG] _on_queue_empty called")
         log_info("Download queue empty")
     
     def _start_download(self, url: str, video_info: dict, queue_item: QueueItem = None):

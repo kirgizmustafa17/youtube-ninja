@@ -107,15 +107,22 @@ class YouTubeDownloader:
     
     def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
         """Fetch video metadata without downloading"""
+        print(f"[DEBUG] get_video_info() called for: {url[:50]}")
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
+            'socket_timeout': 15,
+            'retries': 2,
+            'ignoreerrors': True,
         }
         
         try:
+            print("[DEBUG] Creating YoutubeDL instance...")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                print("[DEBUG] Calling extract_info()...")
                 info = ydl.extract_info(url, download=False)
+                print(f"[DEBUG] extract_info() returned: {info.get('title', 'Unknown')[:30] if info else 'None'}")
                 return {
                     'title': info.get('title', 'Unknown'),
                     'thumbnail': info.get('thumbnail', ''),
@@ -124,7 +131,7 @@ class YouTubeDownloader:
                     'view_count': info.get('view_count', 0),
                 }
         except Exception as e:
-            print(f"Error fetching video info: {e}")
+            print(f"[DEBUG] get_video_info exception: {e}")
             return None
     
     def cancel_download(self):

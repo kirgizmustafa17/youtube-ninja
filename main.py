@@ -287,8 +287,10 @@ class YouTubeDownloaderApp:
             on_queue_empty=self._on_queue_empty
         )
         
-        # Track pending video info fetches
-        self.pending_info_workers = {}
+        # Track pending video info fetches - serialize to avoid yt-dlp blocking
+        self.pending_urls = []  # URLs waiting for video info
+        self.active_info_worker = None  # Only one worker at a time
+        self.pending_info_workers = {}  # Keep for cleanup
         
         self.setup_tray_icon()
         self.setup_clipboard_monitor()
@@ -496,12 +498,35 @@ class YouTubeDownloaderApp:
             2000
         )
         
-        # Fetch video info asynchronously
+        # Add URL to pending queue
+        self.pending_urls.append(url)
+        print(f"[DEBUG] URL added to pending_urls, count: {len(self.pending_urls)}")
+        
+        # Start processing if no active worker
+        self._process_next_url()
+    
+    def _process_next_url(self):
+        """Process next URL in pending queue (serial processing)"""
+        # Skip if already processing
+        if self.active_info_worker is not None:
+            print(f"[DEBUG] _process_next_url: worker active, waiting...")
+            return
+        
+        # Skip if no pending URLs
+        if not self.pending_urls:
+            print(f"[DEBUG] _process_next_url: no pending URLs")
+            return
+        
+        # Get next URL
+        url = self.pending_urls.pop(0)
+        print(f"[DEBUG] _process_next_url: starting {url[:50]}")
+        
+        # Create worker
         worker = VideoInfoWorker(url, self.downloader)
         worker.info_ready.connect(self._on_video_info_ready)
         worker.info_failed.connect(self._on_video_info_failed)
+        self.active_info_worker = worker
         self.pending_info_workers[url] = worker
-        print(f"[DEBUG] Starting VideoInfoWorker, pending count: {len(self.pending_info_workers)}")
         worker.start()
     
     def _on_video_info_ready(self, url: str, video_info: dict):
@@ -511,6 +536,7 @@ class YouTubeDownloaderApp:
         # Clean up worker
         if url in self.pending_info_workers:
             del self.pending_info_workers[url]
+        self.active_info_worker = None
         
         # Add to download queue
         position = self.download_queue.add_url(
@@ -529,12 +555,16 @@ class YouTubeDownloaderApp:
                 QSystemTrayIcon.Information,
                 2000
             )
+        
+        # Process next URL in queue
+        self._process_next_url()
     
     def _on_video_info_failed(self, url: str, error: str):
         """Handle failed video info fetch"""
         # Clean up worker
         if url in self.pending_info_workers:
             del self.pending_info_workers[url]
+        self.active_info_worker = None
         
         self.processed_urls.discard(url)
         self.tray_icon.showMessage(
@@ -543,6 +573,9 @@ class YouTubeDownloaderApp:
             QSystemTrayIcon.Critical,
             3000
         )
+        
+        # Process next URL in queue
+        self._process_next_url()
     
     def _on_queue_next(self, item: QueueItem):
         """Handle next item in queue - start download"""

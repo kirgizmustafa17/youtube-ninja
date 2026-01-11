@@ -67,9 +67,11 @@ class DownloadQueue:
         """
         self._queue.append(item)
         position = len(self._queue) - 1
+        print(f"[DEBUG] Queue.add(): position={position}, is_downloading={self._is_downloading}, queue_len={len(self._queue)}")
         
         # Start processing if not already downloading
         if not self._is_downloading:
+            print("[DEBUG] Queue.add(): calling _process_next")
             self._process_next()
         
         return position
@@ -96,15 +98,21 @@ class DownloadQueue:
     
     def _process_next(self):
         """Process next item in queue"""
+        print(f"[DEBUG] Queue._process_next(): queue_len={len(self._queue)}, has_callback={self._on_next_callback is not None}")
         if self._queue:
             self._current = self._queue.popleft()
             self._is_downloading = True
+            print(f"[DEBUG] Queue._process_next(): starting {self._current.video_info.get('title', 'Unknown')[:30]}")
             
             if self._on_next_callback:
+                print("[DEBUG] Queue._process_next(): calling on_next_callback")
                 self._on_next_callback(self._current)
+            else:
+                print("[DEBUG] Queue._process_next(): NO CALLBACK SET!")
         else:
             self._current = None
             self._is_downloading = False
+            print("[DEBUG] Queue._process_next(): queue empty")
             
             if self._on_queue_empty_callback:
                 self._on_queue_empty_callback()

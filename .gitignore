@@ -11,3 +11,6 @@ logs/
 build/
 dist/
 *.spec
+
+# Images
+gorsel*.png

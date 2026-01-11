@@ -199,7 +199,8 @@ class DownloadWorker(QThread):
     
     def __init__(self, url: str, downloader: YouTubeDownloader, 
                  download_video: bool = True, download_audio: bool = True,
-                 video_quality: str = '1080', audio_quality: str = '0'):
+                 video_quality: str = '1080', audio_quality: str = '0',
+                 video_info: dict = None):
         super().__init__()
         self.url = url
         self.downloader = downloader
@@ -207,17 +208,21 @@ class DownloadWorker(QThread):
         self.download_audio = download_audio
         self.video_quality = video_quality
         self.audio_quality = audio_quality
+        self.video_info = video_info
     
     def run(self):
         """Execute the download"""
+        print(f"[DEBUG] DownloadWorker.run() starting for: {self.url[:50]}")
         results = self.downloader.download_video(
             self.url,
             progress_callback=self._on_progress,
             download_video=self.download_video,
             download_audio=self.download_audio,
             video_quality=self.video_quality,
-            audio_quality=self.audio_quality
+            audio_quality=self.audio_quality,
+            video_info=self.video_info
         )
+        print(f"[DEBUG] DownloadWorker.run() complete, results: {results}")
         self.download_complete.emit(results)
     
     def _on_progress(self, download_type: str, percent: float, status: str):
@@ -628,7 +633,8 @@ class YouTubeDownloaderApp:
             download_video=download_video,
             download_audio=download_audio,
             video_quality=video_quality,
-            audio_quality=audio_quality
+            audio_quality=audio_quality,
+            video_info=video_info
         )
         self.download_worker.progress_update.connect(self.current_window.update_progress)
         self.download_worker.download_complete.connect(self._on_download_complete)

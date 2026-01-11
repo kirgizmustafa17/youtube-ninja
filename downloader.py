@@ -145,7 +145,8 @@ class YouTubeDownloader:
         download_video: bool = True,
         download_audio: bool = True,
         video_quality: str = '1080',
-        audio_quality: str = '0'
+        audio_quality: str = '0',
+        video_info: Optional[Dict[str, Any]] = None
     ) -> Dict[str, bool]:
         """
         Download video and/or audio based on options
@@ -160,6 +161,7 @@ class YouTubeDownloader:
             download_audio: Whether to download audio/MP3
             video_quality: Video quality ('360', '480', '720', '1080', '1440', '2160', '4320')
             audio_quality: Audio quality ('0' = best, '1' = good)
+            video_info: Pre-fetched video info (optional, avoids extra API call)
         
         Returns:
             Dict with 'video' and 'audio' success status
@@ -167,8 +169,8 @@ class YouTubeDownloader:
         self._cancel_requested = False
         results = {'video': False, 'audio': False}
         
-        # Get video info for filename
-        info = self.get_video_info(url)
+        # Use provided video_info or fetch it
+        info = video_info if video_info else self.get_video_info(url)
         if not info:
             return results
         

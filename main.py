@@ -708,7 +708,7 @@ class YouTubeDownloaderApp:
             video_info = {
                 'title': video['title'],
                 'url': video_url,
-                'thumbnail': '',
+                'thumbnail': video.get('thumbnail', ''),
                 'duration': 0,
                 'uploader': '',
                 'view_count': 0,

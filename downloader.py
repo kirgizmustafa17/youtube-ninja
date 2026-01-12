@@ -135,7 +135,7 @@ class YouTubeDownloader:
         return match.group(1) if match else None
     
     def get_playlist_info(self, url: str) -> Optional[Dict[str, Any]]:
-        """Fetch playlist metadata and video list"""
+        """Fetch playlist metadata and video list using print option"""
         print(f"[DEBUG] get_playlist_info() called for: {url}")
         
         # Convert watch URL to playlist URL for better extraction
@@ -146,46 +146,58 @@ class YouTubeDownloader:
         else:
             playlist_url = url
         
+        videos = []
+        playlist_title = "Playlist"
+        
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'extract_flat': 'in_playlist',  # Only flatten for playlist entries
+            'extract_flat': 'in_playlist',
             'socket_timeout': 30,
+            'ignoreerrors': True,
         }
         
         try:
-            print("[DEBUG] Creating YoutubeDL for playlist...")
+            print("[DEBUG] Extracting playlist info...")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                print("[DEBUG] Calling extract_info for playlist...")
                 info = ydl.extract_info(playlist_url, download=False)
-                print(f"[DEBUG] extract_info returned _type={info.get('_type', 'unknown') if info else 'None'}")
                 
-                if info:
-                    # Handle both playlist and single video with playlist
-                    entries = info.get('entries', [])
-                    if not entries and info.get('_type') != 'playlist':
-                        # Might be a single video, wrap in list
-                        entries = [info]
-                    
-                    videos = []
-                    for entry in entries:
-                        if entry:
+                if not info:
+                    print("[DEBUG] No info returned")
+                    return None
+                
+                playlist_title = info.get('title', 'Playlist')
+                print(f"[DEBUG] Playlist title: {playlist_title}")
+                
+                entries = info.get('entries', [])
+                print(f"[DEBUG] Raw entries count: {len(entries) if entries else 0}")
+                
+                for entry in entries:
+                    if entry:
+                        video_id = entry.get('id', '')
+                        if video_id:
+                            # Generate thumbnail URL from video ID
+                            thumbnail = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
                             videos.append({
-                                'url': f"https://www.youtube.com/watch?v={entry.get('id', '')}",
+                                'url': f"https://www.youtube.com/watch?v={video_id}",
                                 'title': entry.get('title', 'Unknown'),
-                                'id': entry.get('id', ''),
+                                'id': video_id,
+                                'thumbnail': thumbnail,
                             })
-                    
-                    print(f"[DEBUG] Found {len(videos)} videos in playlist")
-                    
+                
+                print(f"[DEBUG] Found {len(videos)} videos in playlist")
+                
+                if videos:
                     return {
-                        'title': info.get('title', 'Playlist'),
-                        'id': info.get('id', playlist_id),
+                        'title': playlist_title,
+                        'id': playlist_id,
                         'video_count': len(videos),
                         'videos': videos,
                     }
+                    
         except Exception as e:
             print(f"[DEBUG] get_playlist_info exception: {e}")
+        
         return None
     
     def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
@@ -271,6 +283,7 @@ class YouTubeDownloader:
             music_output = self.music_dir / safe_playlist
             videos_output.mkdir(exist_ok=True)
             music_output.mkdir(exist_ok=True)
+            print(f"[DEBUG] Playlist subdirectory: {music_output}")
         
         # Download audio (MP3) first - it's faster, with retry
         if download_audio and not self._cancel_requested:

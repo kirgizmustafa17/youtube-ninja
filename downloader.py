@@ -137,28 +137,50 @@ class YouTubeDownloader:
     def get_playlist_info(self, url: str) -> Optional[Dict[str, Any]]:
         """Fetch playlist metadata and video list"""
         print(f"[DEBUG] get_playlist_info() called for: {url}")
+        
+        # Convert watch URL to playlist URL for better extraction
+        playlist_id = self.extract_playlist_id(url)
+        if playlist_id:
+            playlist_url = f"https://www.youtube.com/playlist?list={playlist_id}"
+            print(f"[DEBUG] Using playlist URL: {playlist_url}")
+        else:
+            playlist_url = url
+        
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'extract_flat': True,  # Don't download, just get playlist info
-            'socket_timeout': 15,
+            'extract_flat': 'in_playlist',  # Only flatten for playlist entries
+            'socket_timeout': 30,
         }
         
         try:
+            print("[DEBUG] Creating YoutubeDL for playlist...")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if info and info.get('_type') == 'playlist':
+                print("[DEBUG] Calling extract_info for playlist...")
+                info = ydl.extract_info(playlist_url, download=False)
+                print(f"[DEBUG] extract_info returned _type={info.get('_type', 'unknown') if info else 'None'}")
+                
+                if info:
+                    # Handle both playlist and single video with playlist
+                    entries = info.get('entries', [])
+                    if not entries and info.get('_type') != 'playlist':
+                        # Might be a single video, wrap in list
+                        entries = [info]
+                    
                     videos = []
-                    for entry in info.get('entries', []):
+                    for entry in entries:
                         if entry:
                             videos.append({
                                 'url': f"https://www.youtube.com/watch?v={entry.get('id', '')}",
                                 'title': entry.get('title', 'Unknown'),
                                 'id': entry.get('id', ''),
                             })
+                    
+                    print(f"[DEBUG] Found {len(videos)} videos in playlist")
+                    
                     return {
                         'title': info.get('title', 'Playlist'),
-                        'id': info.get('id', ''),
+                        'id': info.get('id', playlist_id),
                         'video_count': len(videos),
                         'videos': videos,
                     }

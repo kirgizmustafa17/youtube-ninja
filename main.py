@@ -621,30 +621,71 @@ class YouTubeDownloaderApp:
         self._process_next_url()
     
     def _on_playlist_url_detected(self, url: str):
-        """Handle detected YouTube playlist URL"""
+        """Handle detected YouTube playlist URL - ask user what to download"""
         print(f"[DEBUG] _on_playlist_url_detected: {url}")
         
         # Skip if already processing this URL
         if url in self.processed_urls:
             return
         
-        self.processed_urls.add(url)
+        # Extract video ID and playlist ID
+        video_id = self.downloader.extract_video_id(url)
+        playlist_id = self.downloader.extract_playlist_id(url)
         
-        # Show notification
-        self.tray_icon.showMessage(
-            "Playlist Algılandı",
-            "Playlist bilgileri alınıyor...",
-            QSystemTrayIcon.Information,
-            2000
-        )
+        print(f"[DEBUG] video_id={video_id}, playlist_id={playlist_id}")
         
-        # Fetch playlist info asynchronously
-        worker = PlaylistInfoWorker(url, self.downloader)
-        worker.playlist_ready.connect(self._on_playlist_ready)
-        worker.playlist_failed.connect(self._on_playlist_failed)
-        worker.start()
-        # Store reference to prevent garbage collection
-        self._playlist_worker = worker
+        # If no playlist ID found, treat as single video
+        if not playlist_id:
+            self._on_youtube_url_detected(url)
+            return
+        
+        # Ask user what to download
+        from PyQt5.QtWidgets import QMessageBox
+        
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Question)
+        msg.setWindowTitle("Playlist Algılandı")
+        msg.setText("Bu bağlantı bir playlist içeriyor.\nNe indirmek istersiniz?")
+        
+        single_btn = msg.addButton("Tekil Video", QMessageBox.ActionRole)
+        playlist_btn = msg.addButton("Tüm Playlist", QMessageBox.ActionRole)
+        cancel_btn = msg.addButton("İptal", QMessageBox.RejectRole)
+        
+        msg.exec_()
+        
+        clicked = msg.clickedButton()
+        
+        if clicked == single_btn:
+            # Download single video - remove list parameter
+            if video_id:
+                single_url = f"https://www.youtube.com/watch?v={video_id}"
+                print(f"[DEBUG] Downloading single video: {single_url}")
+                self._on_youtube_url_detected(single_url)
+            else:
+                self.tray_icon.showMessage(
+                    "Hata",
+                    "Video ID bulunamadı",
+                    QSystemTrayIcon.Critical,
+                    3000
+                )
+        elif clicked == playlist_btn:
+            # Download entire playlist
+            self.processed_urls.add(url)
+            
+            self.tray_icon.showMessage(
+                "Playlist Algılandı",
+                "Playlist bilgileri alınıyor...",
+                QSystemTrayIcon.Information,
+                2000
+            )
+            
+            # Fetch playlist info asynchronously
+            worker = PlaylistInfoWorker(url, self.downloader)
+            worker.playlist_ready.connect(self._on_playlist_ready)
+            worker.playlist_failed.connect(self._on_playlist_failed)
+            worker.start()
+            self._playlist_worker = worker
+        # else: cancelled - do nothing
     
     def _on_playlist_ready(self, url: str, playlist_info: dict):
         """Handle successful playlist info fetch"""

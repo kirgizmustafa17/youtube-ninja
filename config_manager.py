@@ -17,6 +17,7 @@ DEFAULT_CONFIG = {
     'donate_url': 'https://buymeacoffee.com/',
     'output_video_dir': '',  # Empty = ~/Videos
     'output_audio_dir': '',  # Empty = ~/Music
+    'language': 'tr',  # Default language: Turkish
 }
 
 
@@ -136,6 +137,14 @@ class ConfigManager:
     @output_audio_dir.setter
     def output_audio_dir(self, value):
         self.set('output_audio_dir', str(value) if value else '')
+    
+    @property
+    def language(self) -> str:
+        return self.get('language', 'tr')
+    
+    @language.setter
+    def language(self, value: str):
+        self.set('language', value)
     
     @staticmethod
     def get_available_qualities() -> list:

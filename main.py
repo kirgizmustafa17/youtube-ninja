@@ -31,6 +31,7 @@ from logger import log_info, log_error, log_warning, log_download_start, log_dow
 from history import get_history_manager
 from queue_manager import DownloadQueue, QueueItem
 from updater import YtDlpUpdater, get_ytdlp_version, AppVersionManager
+from i18n import init_i18n, _, set_language, I18n
 
 
 class FFmpegDownloader(QThread):
@@ -311,6 +312,9 @@ class YouTubeDownloaderApp:
         # Initialize config manager
         self.config = get_config_manager(Path(__file__).parent.resolve())
         
+        # Initialize i18n with saved language
+        init_i18n(self.config.language)
+        
         # Initialize history manager
         self.history = get_history_manager(Path(__file__).parent.resolve())
         
@@ -456,6 +460,20 @@ class YouTubeDownloaderApp:
         
         tray_menu.addMenu(folder_menu)
         
+        # Language selection menu
+        language_menu = QMenu("🌍 Dil / Language", tray_menu)
+        self.language_actions = {}
+        
+        for lang_code, lang_name in I18n.LANGUAGES.items():
+            action = QAction(lang_name, self.app)
+            action.setCheckable(True)
+            action.setChecked(lang_code == self.config.language)
+            action.triggered.connect(lambda checked, lc=lang_code: self._set_language(lc))
+            self.language_actions[lang_code] = action
+            language_menu.addAction(action)
+        
+        tray_menu.addMenu(language_menu)
+        
         tray_menu.addSeparator()
         
         # About button
@@ -512,6 +530,28 @@ class YouTubeDownloaderApp:
     def _open_donate(self):
         """Open donate URL in browser"""
         QDesktopServices.openUrl(QUrl(self.config.donate_url))
+    
+    def _set_language(self, lang_code: str):
+        """Change application language"""
+        if lang_code == self.config.language:
+            return
+        
+        # Save new language
+        self.config.language = lang_code
+        set_language(lang_code)
+        
+        # Update checkmarks
+        for lc, action in self.language_actions.items():
+            action.setChecked(lc == lang_code)
+        
+        # Show restart notification
+        self.tray_icon.showMessage(
+            _('app.name'),
+            f"Language changed. Restart app for full effect." if lang_code == 'en' 
+            else "Dil değiştirildi. Tam efekt için uygulamayı yeniden başlatın.",
+            QSystemTrayIcon.Information,
+            3000
+        )
     
     def setup_clipboard_monitor(self):
         """Setup clipboard monitoring"""

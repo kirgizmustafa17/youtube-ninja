@@ -31,6 +31,7 @@ from logger import log_info, log_error, log_warning, log_download_start, log_dow
 from history import get_history_manager
 from queue_manager import DownloadQueue, QueueItem
 from updater import YtDlpUpdater, get_ytdlp_version, AppVersionManager
+from i18n import init_i18n, _, set_language, I18n
 
 
 class FFmpegDownloader(QThread):
@@ -311,6 +312,9 @@ class YouTubeDownloaderApp:
         # Initialize config manager
         self.config = get_config_manager(Path(__file__).parent.resolve())
         
+        # Initialize i18n with saved language
+        init_i18n(self.config.language)
+        
         # Initialize history manager
         self.history = get_history_manager(Path(__file__).parent.resolve())
         
@@ -398,21 +402,21 @@ class YouTubeDownloaderApp:
         tray_menu.addAction(options_label)
         
         # MP3 download toggle
-        self.mp3_action = QAction("🎵 MP3 İndir", self.app)
+        self.mp3_action = QAction(f"🎵 {_('tray.download_mp3')}", self.app)
         self.mp3_action.setCheckable(True)
         self.mp3_action.setChecked(self.config.download_mp3)
         self.mp3_action.triggered.connect(self._toggle_mp3)
         tray_menu.addAction(self.mp3_action)
         
         # Video download toggle
-        self.video_action = QAction("📹 Video İndir", self.app)
+        self.video_action = QAction(f"📹 {_('tray.download_video')}", self.app)
         self.video_action.setCheckable(True)
         self.video_action.setChecked(self.config.download_video)
         self.video_action.triggered.connect(self._toggle_video)
         tray_menu.addAction(self.video_action)
         
         # Video quality submenu - all qualities available
-        self.quality_menu = QMenu("🎬 Video Kalitesi", tray_menu)
+        self.quality_menu = QMenu(f"🎬 {_('tray.quality')}", tray_menu)
         self.quality_actions = {}
         
         for quality in ConfigManager.get_available_qualities():
@@ -438,32 +442,46 @@ class YouTubeDownloaderApp:
         tray_menu.addAction(music_action)
         
         # Folder settings submenu
-        folder_menu = QMenu("📂 Çıktı Klasörleri", tray_menu)
+        folder_menu = QMenu(f"📂 {_('tray.output_folders')}", tray_menu)
         
-        change_video_folder = QAction("Video klasörünü değiştir...", self.app)
+        change_video_folder = QAction(_('tray.video_folder'), self.app)
         change_video_folder.triggered.connect(self._change_video_folder)
         folder_menu.addAction(change_video_folder)
         
-        change_audio_folder = QAction("Müzik klasörünü değiştir...", self.app)
+        change_audio_folder = QAction(_('tray.music_folder'), self.app)
         change_audio_folder.triggered.connect(self._change_audio_folder)
         folder_menu.addAction(change_audio_folder)
         
         folder_menu.addSeparator()
         
-        reset_folders = QAction("Varsayılana sıfırla", self.app)
+        reset_folders = QAction(_('tray.reset_folders'), self.app)
         reset_folders.triggered.connect(self._reset_folders)
         folder_menu.addAction(reset_folders)
         
         tray_menu.addMenu(folder_menu)
         
+        # Language selection menu
+        language_menu = QMenu(f"🌍 {_('tray.language')}", tray_menu)
+        self.language_actions = {}
+        
+        for lang_code, lang_name in I18n.LANGUAGES.items():
+            action = QAction(lang_name, self.app)
+            action.setCheckable(True)
+            action.setChecked(lang_code == self.config.language)
+            action.triggered.connect(lambda checked, lc=lang_code: self._set_language(lc))
+            self.language_actions[lang_code] = action
+            language_menu.addAction(action)
+        
+        tray_menu.addMenu(language_menu)
+        
         tray_menu.addSeparator()
         
         # About button
-        about_action = QAction("ℹ️ Hakkında", self.app)
+        about_action = QAction(f"ℹ️ {_('tray.about')}", self.app)
         about_action.triggered.connect(self._show_about)
         tray_menu.addAction(about_action)
         
-        quit_action = QAction("❌ Çıkış", self.app)
+        quit_action = QAction(f"❌ {_('tray.quit')}", self.app)
         quit_action.triggered.connect(self.quit)
         tray_menu.addAction(quit_action)
         
@@ -472,8 +490,8 @@ class YouTubeDownloaderApp:
         
         # Show notification
         self.tray_icon.showMessage(
-            "YouTube Downloader",
-            "Uygulama başlatıldı. Clipboard izleniyor...",
+            _('app.name'),
+            _('app.monitoring'),
             QSystemTrayIcon.Information,
             3000
         )
@@ -512,6 +530,28 @@ class YouTubeDownloaderApp:
     def _open_donate(self):
         """Open donate URL in browser"""
         QDesktopServices.openUrl(QUrl(self.config.donate_url))
+    
+    def _set_language(self, lang_code: str):
+        """Change application language"""
+        if lang_code == self.config.language:
+            return
+        
+        # Save new language
+        self.config.language = lang_code
+        set_language(lang_code)
+        
+        # Update checkmarks
+        for lc, action in self.language_actions.items():
+            action.setChecked(lc == lang_code)
+        
+        # Show restart notification
+        self.tray_icon.showMessage(
+            _('app.name'),
+            f"Language changed. Restart app for full effect." if lang_code == 'en' 
+            else "Dil değiştirildi. Tam efekt için uygulamayı yeniden başlatın.",
+            QSystemTrayIcon.Information,
+            3000
+        )
     
     def setup_clipboard_monitor(self):
         """Setup clipboard monitoring"""
@@ -611,8 +651,8 @@ class YouTubeDownloaderApp:
         
         self.processed_urls.discard(url)
         self.tray_icon.showMessage(
-            "Hata",
-            f"Video bilgileri alınamadı: {error[:50]}",
+            _('notification.error'),
+            f"{_('error.video_info_failed')}: {error[:50]}",
             QSystemTrayIcon.Critical,
             3000
         )
@@ -644,12 +684,12 @@ class YouTubeDownloaderApp:
         
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Question)
-        msg.setWindowTitle("Playlist Algılandı")
-        msg.setText("Bu bağlantı bir playlist içeriyor.\nNe indirmek istersiniz?")
+        msg.setWindowTitle(_('playlist.detected'))
+        msg.setText(_('playlist.question'))
         
-        single_btn = msg.addButton("Tekil Video", QMessageBox.ActionRole)
-        playlist_btn = msg.addButton("Tüm Playlist", QMessageBox.ActionRole)
-        cancel_btn = msg.addButton("İptal", QMessageBox.RejectRole)
+        single_btn = msg.addButton(_('playlist.single_video'), QMessageBox.ActionRole)
+        playlist_btn = msg.addButton(_('playlist.all_playlist'), QMessageBox.ActionRole)
+        cancel_btn = msg.addButton(_('playlist.cancel'), QMessageBox.RejectRole)
         
         msg.exec_()
         
@@ -663,8 +703,8 @@ class YouTubeDownloaderApp:
                 self._on_youtube_url_detected(single_url)
             else:
                 self.tray_icon.showMessage(
-                    "Hata",
-                    "Video ID bulunamadı",
+                    _('notification.error'),
+                    _('playlist.no_video_id'),
                     QSystemTrayIcon.Critical,
                     3000
                 )
@@ -673,8 +713,8 @@ class YouTubeDownloaderApp:
             self.processed_urls.add(url)
             
             self.tray_icon.showMessage(
-                "Playlist Algılandı",
-                "Playlist bilgileri alınıyor...",
+                _('playlist.detected'),
+                _('playlist.fetching'),
                 QSystemTrayIcon.Information,
                 2000
             )

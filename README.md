@@ -16,7 +16,9 @@ Clipboard'dan YouTube linklerini otomatik algılayıp indiren Windows uygulamas�
 - 📜 **İndirme Geçmişi** - Daha önce indirilenleri takip et
 - 🔔 **Bildirim Sesleri** - İndirme tamamlandığında ses
 - ⚡ **Otomatik Yeniden Deneme** - Bağlantı kesilirse 3 deneme
-- 🔧 **yt-dlp Güncelleme** - Tek tıkla güncelle
+- 🔧 **Otomatik Güncelleme** - yt-dlp ve bağımlılıklarını açılışta günceller
+- 🦕 **Deno Desteği** - Gelişmiş imza çözümü için Deno runtime entegrasyonu
+- 🌍 **Çoklu Dil** - Türkçe ve İngilizce desteği
 
 ## 📦 Kurulum
 
@@ -51,8 +53,8 @@ python main.py
 | ☑️ Video İndir | Video dosyası indir |
 | 📺 Video Kalitesi | 360p - 8K arası seç |
 | 📂 Çıktı Klasörleri | İndirme konumunu değiştir |
-| 🔄 yt-dlp Güncelle | En son sürüme güncelle |
-| ⬇️ FFmpeg İndir | FFmpeg otomatik indir |
+| 🌍 Dil | Türkçe / İngilizce seçimi |
+| ℹ️ Hakkında | Sürüm bilgisi ve bağış |
 
 ## 📁 Dosya Yapısı
 

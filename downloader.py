@@ -218,13 +218,15 @@ class YouTubeDownloader:
     def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
         """Fetch video metadata without downloading"""
         print(f"[DEBUG] get_video_info() called for: {url[:50]}")
+        self.last_error = None  # Reset last error
+        
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
             'socket_timeout': 15,
             'retries': 2,
-            'ignoreerrors': True,
+            'ignoreerrors': False,  # Don't ignore errors - we want to catch them
             **self.get_cookie_opts(),  # Add cookie options
         }
         
@@ -233,7 +235,11 @@ class YouTubeDownloader:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 print("[DEBUG] Calling extract_info()...")
                 info = ydl.extract_info(url, download=False)
-                print(f"[DEBUG] extract_info() returned: {info.get('title', 'Unknown')[:30] if info else 'None'}")
+                if info is None:
+                    self.last_error = "Video bilgisi alınamadı"
+                    print(f"[DEBUG] extract_info() returned: None for: {url}")
+                    return None
+                print(f"[DEBUG] extract_info() returned: {info.get('title', 'Unknown')[:30]}")
                 return {
                     'title': info.get('title', 'Unknown'),
                     'thumbnail': info.get('thumbnail', ''),
@@ -242,7 +248,9 @@ class YouTubeDownloader:
                     'view_count': info.get('view_count', 0),
                 }
         except Exception as e:
-            print(f"[DEBUG] get_video_info exception: {e}")
+            error_str = str(e)
+            print(f"[DEBUG] get_video_info exception: {error_str}")
+            self.last_error = error_str
             return None
     
     def cancel_download(self):

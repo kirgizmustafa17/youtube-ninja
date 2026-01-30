@@ -248,6 +248,7 @@ class YouTubeDownloader:
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
+            'skip_download': True,  # Don't try to select formats for metadata
             'socket_timeout': 15,
             'retries': 2,
             'ignoreerrors': False,  # Don't ignore errors - we want to catch them

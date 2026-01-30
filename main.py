@@ -125,6 +125,75 @@ class FFmpegDownloader(QThread):
             self.finished.emit(False, f"Hata: {str(e)}")
 
 
+class DenoDownloader(QThread):
+    """Thread to download and extract Deno JavaScript runtime"""
+    
+    progress = pyqtSignal(int, str)  # percent, status
+    finished = pyqtSignal(bool, str)  # success, message
+    
+    # Deno download URLs from GitHub releases
+    DENO_URLS = {
+        'Linux': 'https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip',
+        'Windows': 'https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip',
+        'Darwin': 'https://github.com/denoland/deno/releases/latest/download/deno-x86_64-apple-darwin.zip',
+    }
+    
+    def __init__(self, target_dir: Path):
+        super().__init__()
+        self.target_dir = target_dir
+        self.system = platform.system()
+    
+    def run(self):
+        try:
+            url = self.DENO_URLS.get(self.system)
+            if not url:
+                self.finished.emit(False, f"Desteklenmeyen sistem: {self.system}")
+                return
+            
+            self.progress.emit(0, "Deno indiriliyor...")
+            
+            # Download file
+            response = requests.get(url, stream=True, allow_redirects=True)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded = 0
+            
+            archive_path = self.target_dir / 'deno.zip'
+            
+            with open(archive_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            percent = int((downloaded / total_size) * 80)
+                            self.progress.emit(percent, f"İndiriliyor... {downloaded // (1024*1024)} MB")
+            
+            self.progress.emit(80, "Arşiv çıkartılıyor...")
+            
+            # Extract archive
+            with zipfile.ZipFile(archive_path, 'r') as zf:
+                zf.extractall(self.target_dir)
+            
+            self.progress.emit(90, "Dosyalar düzenleniyor...")
+            
+            # Make executable on Linux/Mac
+            if self.system != 'Windows':
+                deno_path = self.target_dir / 'deno'
+                if deno_path.exists():
+                    os.chmod(deno_path, 0o755)
+            
+            # Clean up
+            archive_path.unlink()
+            
+            self.progress.emit(100, "Tamamlandı!")
+            self.finished.emit(True, f"Deno başarıyla indirildi: {self.target_dir}")
+            
+        except Exception as e:
+            self.finished.emit(False, f"Hata: {str(e)}")
+
+
 class ClipboardMonitor(QThread):
     """Thread to monitor clipboard for YouTube URLs"""
     
@@ -343,6 +412,9 @@ class YouTubeDownloaderApp:
         
         # Check for FFmpeg at startup
         self._check_ffmpeg_startup()
+        
+        # Check for Deno (JS runtime) at startup
+        self._check_deno_startup()
         
         # Handle Ctrl+C gracefully
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -1122,6 +1194,90 @@ class YouTubeDownloaderApp:
         else:
             self.tray_icon.showMessage(
                 "FFmpeg İndirme Hatası",
+                message,
+                QSystemTrayIcon.Critical,
+                3000
+            )
+    
+    def _check_deno_startup(self):
+        """Check if Deno (JS runtime) is available at startup"""
+        import shutil
+        app_dir = Path(__file__).parent.resolve()
+        
+        # Check in app directory first
+        deno_local = app_dir / ('deno.exe' if platform.system() == 'Windows' else 'deno')
+        
+        # Check in system PATH
+        deno_system = shutil.which('deno')
+        
+        if not deno_local.exists() and not deno_system:
+            # Deno not found - ask user to download
+            reply = QMessageBox.question(
+                None,
+                "Deno Bulunamadı",
+                "Deno JavaScript runtime bulunamadı.\n\n"
+                "YouTube videoları için Deno gereklidir.\n"
+                "Deno'yu şimdi indirmek ister misiniz? (~45 MB)",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                # Trigger Deno download after app starts
+                QTimer.singleShot(500, self._download_deno)
+        else:
+            log_info("Deno found")
+    
+    def _download_deno(self):
+        """Download Deno from GitHub"""
+        app_dir = Path(__file__).parent.resolve()
+        
+        # Check if Deno already exists
+        deno_path = app_dir / ('deno.exe' if platform.system() == 'Windows' else 'deno')
+        if deno_path.exists():
+            reply = QMessageBox.question(
+                None,
+                "Deno Mevcut",
+                "Deno zaten mevcut. Yeniden indirmek ister misiniz?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+        
+        # Create progress dialog
+        self.deno_progress = QProgressDialog("Deno indiriliyor...", "İptal", 0, 100)
+        self.deno_progress.setWindowTitle("Deno İndirme")
+        self.deno_progress.setWindowModality(Qt.WindowModal)
+        self.deno_progress.setAutoClose(True)
+        self.deno_progress.show()
+        
+        # Start download
+        self.deno_downloader = DenoDownloader(app_dir)
+        self.deno_downloader.progress.connect(self._on_deno_progress)
+        self.deno_downloader.finished.connect(self._on_deno_finished)
+        self.deno_downloader.start()
+    
+    def _on_deno_progress(self, percent: int, status: str):
+        """Handle Deno download progress"""
+        if hasattr(self, 'deno_progress'):
+            self.deno_progress.setValue(percent)
+            self.deno_progress.setLabelText(status)
+    
+    def _on_deno_finished(self, success: bool, message: str):
+        """Handle Deno download completion"""
+        if hasattr(self, 'deno_progress'):
+            self.deno_progress.close()
+        
+        if success:
+            self.tray_icon.showMessage(
+                "Deno İndirildi",
+                message,
+                QSystemTrayIcon.Information,
+                3000
+            )
+        else:
+            self.tray_icon.showMessage(
+                "Deno İndirme Hatası",
                 message,
                 QSystemTrayIcon.Critical,
                 3000

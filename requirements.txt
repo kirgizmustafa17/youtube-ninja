@@ -1,3 +1,4 @@
 PyQt5>=5.15.0
 yt-dlp>=2024.0.0
+yt-dlp-ejs>=0.4.0
 requests>=2.28.0

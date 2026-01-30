@@ -4,6 +4,7 @@ __pycache__/
 config.json
 ffmpeg*
 ffprobe*
+deno*
 history.json
 logs/
 

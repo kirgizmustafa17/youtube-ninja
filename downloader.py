@@ -34,16 +34,39 @@ class YouTubeDownloader:
     MAX_RETRIES = 3
     RETRY_DELAYS = [2, 5, 10]  # Seconds to wait between retries (exponential backoff)
     
-    def __init__(self, videos_dir: Path = None, music_dir: Path = None):
+    # Supported browsers for cookie extraction
+    SUPPORTED_BROWSERS = ['chrome', 'firefox', 'edge', 'brave', 'opera', 'vivaldi', 'chromium']
+    
+    def __init__(self, videos_dir: Path = None, music_dir: Path = None, cookie_browser: str = None):
         self.home_dir = Path.home()
         self.videos_dir = videos_dir or (self.home_dir / "Videos")
         self.music_dir = music_dir or (self.home_dir / "Music")
+        self.app_dir = Path(__file__).parent.resolve()
+        self.cookie_browser = cookie_browser  # Browser to get cookies from
         
         # Ensure directories exist
         self.videos_dir.mkdir(exist_ok=True)
         self.music_dir.mkdir(exist_ok=True)
         
         self._cancel_requested = False
+    
+    def get_cookie_opts(self) -> dict:
+        """Get cookie options for yt-dlp based on available sources"""
+        opts = {}
+        
+        # First check if cookies.txt exists in app directory
+        cookies_file = self.app_dir / 'cookies.txt'
+        if cookies_file.exists():
+            print(f"[DEBUG] Using cookies file: {cookies_file}")
+            opts['cookiefile'] = str(cookies_file)
+            return opts
+        
+        # Otherwise try browser cookies if configured
+        if self.cookie_browser and self.cookie_browser in self.SUPPORTED_BROWSERS:
+            print(f"[DEBUG] Using cookies from browser: {self.cookie_browser}")
+            opts['cookiesfrombrowser'] = (self.cookie_browser,)
+        
+        return opts
     
     def set_output_dirs(self, videos_dir: Path = None, music_dir: Path = None):
         """Update output directories"""
@@ -155,6 +178,7 @@ class YouTubeDownloader:
             'extract_flat': 'in_playlist',
             'socket_timeout': 30,
             'ignoreerrors': True,
+            **self.get_cookie_opts(),  # Add cookie options
         }
         
         try:
@@ -210,6 +234,7 @@ class YouTubeDownloader:
             'socket_timeout': 15,
             'retries': 2,
             'ignoreerrors': True,
+            **self.get_cookie_opts(),  # Add cookie options
         }
         
         try:
@@ -413,6 +438,7 @@ class YouTubeDownloader:
                 {'key': 'FFmpegMetadata'},
                 {'key': 'EmbedThumbnail'},
             ],
+            **self.get_cookie_opts(),  # Add cookie options
         }
         
         try:
@@ -487,6 +513,7 @@ class YouTubeDownloader:
             'postprocessor_args': {
                 'thumbnailsconvertor': ['-vf', 'crop=in_h:in_h'],
             },
+            **self.get_cookie_opts(),  # Add cookie options
         }
         
         try:

@@ -1,0 +1,16 @@
+venv/
+__pycache__/
+*.pyc
+config.json
+ffmpeg*
+ffprobe*
+history.json
+logs/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Images
+gorsel*.png

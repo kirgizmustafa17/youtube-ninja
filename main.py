@@ -320,7 +320,8 @@ class YouTubeDownloaderApp:
         
         self.downloader = YouTubeDownloader(
             videos_dir=self.config.output_video_dir,
-            music_dir=self.config.output_audio_dir
+            music_dir=self.config.output_audio_dir,
+            cookie_browser=self.config.browser_for_cookies
         )
         self.current_window: Optional[DownloadWindow] = None
         self.download_worker: Optional[DownloadWorker] = None

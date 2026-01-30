@@ -58,5 +58,28 @@
   "about.check_ffmpeg": "Check FFmpeg",
   
   "error.video_info_failed": "Could not fetch video info",
-  "error.ffmpeg_not_found": "FFmpeg not found"
+  "error.ffmpeg_not_found": "FFmpeg not found",
+
+  "notification.update_complete": "Update Complete",
+  "notification.update_failed": "Update Failed",
+  
+  "dialog.ffmpeg_not_found.title": "FFmpeg Not Found",
+  "dialog.ffmpeg_not_found.message": "FFmpeg not found. FFmpeg is required for video processing.\n\nDo you want to download FFmpeg now?",
+  "dialog.ffmpeg_exists.title": "FFmpeg Exists",
+  "dialog.ffmpeg_exists.message": "FFmpeg already exists. Do you want to download it again?",
+  "dialog.ffmpeg_downloading.title": "Downloading FFmpeg",
+  "dialog.ffmpeg_downloading.label": "Downloading FFmpeg...",
+  "notification.ffmpeg_downloaded": "FFmpeg Downloaded",
+  "notification.ffmpeg_error": "FFmpeg Download Error",
+
+  "dialog.deno_not_found.title": "Deno Not Found",
+  "dialog.deno_not_found.message": "Deno JavaScript runtime not found.\n\nDeno is required for YouTube videos.\nDo you want to download Deno now? (~45 MB)",
+  "dialog.deno_exists.title": "Deno Exists",
+  "dialog.deno_exists.message": "Deno already exists. Do you want to download it again?",
+  "dialog.deno_downloading.title": "Downloading Deno",
+  "dialog.deno_downloading.label": "Downloading Deno...",
+  "notification.deno_downloaded": "Deno Downloaded",
+  "notification.deno_error": "Deno Download Error",
+  
+  "action.cancel": "Cancel"
 }

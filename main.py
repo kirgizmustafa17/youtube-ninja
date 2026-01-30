@@ -471,9 +471,8 @@ class YouTubeDownloaderApp:
             # FFmpeg not found - ask user to download
             reply = QMessageBox.question(
                 None,
-                "FFmpeg Bulunamadı",
-                "FFmpeg bulunamadı. Video işleme için FFmpeg gereklidir.\n\n"
-                "FFmpeg'i şimdi indirmek ister misiniz?",
+                _('dialog.ffmpeg_not_found.title'),
+                _('dialog.ffmpeg_not_found.message'),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
             )
@@ -1158,7 +1157,7 @@ class YouTubeDownloaderApp:
         """Handle yt-dlp update completion"""
         if success:
             self.tray_icon.showMessage(
-                "Güncelleme Tamamlandı",
+                _("notification.update_complete"),
                 message,
                 QSystemTrayIcon.Information,
                 3000
@@ -1166,7 +1165,7 @@ class YouTubeDownloaderApp:
             log_info(f"yt-dlp updated: {message}")
         else:
             self.tray_icon.showMessage(
-                "Güncelleme Başarısız",
+                _("notification.update_failed"),
                 message,
                 QSystemTrayIcon.Critical,
                 3000
@@ -1182,8 +1181,8 @@ class YouTubeDownloaderApp:
         if ffmpeg_path.exists():
             reply = QMessageBox.question(
                 None,
-                "FFmpeg Mevcut",
-                "FFmpeg zaten mevcut. Yeniden indirmek ister misiniz?",
+                _('dialog.ffmpeg_exists.title'),
+                _('dialog.ffmpeg_exists.message'),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
@@ -1191,8 +1190,8 @@ class YouTubeDownloaderApp:
                 return
         
         # Create progress dialog
-        self.ffmpeg_progress = QProgressDialog("FFmpeg indiriliyor...", "İptal", 0, 100)
-        self.ffmpeg_progress.setWindowTitle("FFmpeg İndirme")
+        self.ffmpeg_progress = QProgressDialog(_('dialog.ffmpeg_downloading.label'), _('action.cancel'), 0, 100)
+        self.ffmpeg_progress.setWindowTitle(_('dialog.ffmpeg_downloading.title'))
         self.ffmpeg_progress.setWindowModality(Qt.WindowModal)
         self.ffmpeg_progress.setAutoClose(True)
         self.ffmpeg_progress.show()
@@ -1216,14 +1215,14 @@ class YouTubeDownloaderApp:
         
         if success:
             self.tray_icon.showMessage(
-                "FFmpeg İndirildi",
+                _('notification.ffmpeg_downloaded'),
                 message,
                 QSystemTrayIcon.Information,
                 3000
             )
         else:
             self.tray_icon.showMessage(
-                "FFmpeg İndirme Hatası",
+                _('notification.ffmpeg_error'),
                 message,
                 QSystemTrayIcon.Critical,
                 3000
@@ -1244,10 +1243,8 @@ class YouTubeDownloaderApp:
             # Deno not found - ask user to download
             reply = QMessageBox.question(
                 None,
-                "Deno Bulunamadı",
-                "Deno JavaScript runtime bulunamadı.\n\n"
-                "YouTube videoları için Deno gereklidir.\n"
-                "Deno'yu şimdi indirmek ister misiniz? (~45 MB)",
+                _('dialog.deno_not_found.title'),
+                _('dialog.deno_not_found.message'),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
             )
@@ -1266,8 +1263,8 @@ class YouTubeDownloaderApp:
         if deno_path.exists():
             reply = QMessageBox.question(
                 None,
-                "Deno Mevcut",
-                "Deno zaten mevcut. Yeniden indirmek ister misiniz?",
+                _('dialog.deno_exists.title'),
+                _('dialog.deno_exists.message'),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
@@ -1275,8 +1272,8 @@ class YouTubeDownloaderApp:
                 return
         
         # Create progress dialog
-        self.deno_progress = QProgressDialog("Deno indiriliyor...", "İptal", 0, 100)
-        self.deno_progress.setWindowTitle("Deno İndirme")
+        self.deno_progress = QProgressDialog(_('dialog.deno_downloading.label'), _('action.cancel'), 0, 100)
+        self.deno_progress.setWindowTitle(_('dialog.deno_downloading.title'))
         self.deno_progress.setWindowModality(Qt.WindowModal)
         self.deno_progress.setAutoClose(True)
         self.deno_progress.show()
@@ -1300,14 +1297,14 @@ class YouTubeDownloaderApp:
         
         if success:
             self.tray_icon.showMessage(
-                "Deno İndirildi",
+                _('notification.deno_downloaded'),
                 message,
                 QSystemTrayIcon.Information,
                 3000
             )
         else:
             self.tray_icon.showMessage(
-                "Deno İndirme Hatası",
+                _('notification.deno_error'),
                 message,
                 QSystemTrayIcon.Critical,
                 3000

@@ -58,5 +58,28 @@
   "about.check_ffmpeg": "FFmpeg Kontrol",
 
   "error.video_info_failed": "Video bilgileri alınamadı",
-  "error.ffmpeg_not_found": "FFmpeg bulunamadı"
+  "error.ffmpeg_not_found": "FFmpeg bulunamadı",
+
+  "notification.update_complete": "Güncelleme Tamamlandı",
+  "notification.update_failed": "Güncelleme Başarısız",
+  
+  "dialog.ffmpeg_not_found.title": "FFmpeg Bulunamadı",
+  "dialog.ffmpeg_not_found.message": "FFmpeg bulunamadı. Video işleme için FFmpeg gereklidir.\n\nFFmpeg'i şimdi indirmek ister misiniz?",
+  "dialog.ffmpeg_exists.title": "FFmpeg Mevcut",
+  "dialog.ffmpeg_exists.message": "FFmpeg zaten mevcut. Yeniden indirmek ister misiniz?",
+  "dialog.ffmpeg_downloading.title": "FFmpeg İndirme",
+  "dialog.ffmpeg_downloading.label": "FFmpeg indiriliyor...",
+  "notification.ffmpeg_downloaded": "FFmpeg İndirildi",
+  "notification.ffmpeg_error": "FFmpeg İndirme Hatası",
+
+  "dialog.deno_not_found.title": "Deno Bulunamadı",
+  "dialog.deno_not_found.message": "Deno JavaScript runtime bulunamadı.\n\nYouTube videoları için Deno gereklidir.\nDeno'yu şimdi indirmek ister misiniz? (~45 MB)",
+  "dialog.deno_exists.title": "Deno Mevcut",
+  "dialog.deno_exists.message": "Deno zaten mevcut. Yeniden indirmek ister misiniz?",
+  "dialog.deno_downloading.title": "Deno İndirme",
+  "dialog.deno_downloading.label": "Deno indiriliyor...",
+  "notification.deno_downloaded": "Deno İndirildi",
+  "notification.deno_error": "Deno İndirme Hatası",
+  
+  "action.cancel": "İptal"
 }

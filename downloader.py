@@ -34,37 +34,28 @@ class YouTubeDownloader:
     MAX_RETRIES = 3
     RETRY_DELAYS = [2, 5, 10]  # Seconds to wait between retries (exponential backoff)
     
-    # Supported browsers for cookie extraction
-    SUPPORTED_BROWSERS = ['chrome', 'firefox', 'edge', 'brave', 'opera', 'vivaldi', 'chromium']
-    
-    def __init__(self, videos_dir: Path = None, music_dir: Path = None, cookie_browser: str = None):
+    def __init__(self, videos_dir: Path = None, music_dir: Path = None):
         self.home_dir = Path.home()
         self.videos_dir = videos_dir or (self.home_dir / "Videos")
         self.music_dir = music_dir or (self.home_dir / "Music")
         self.app_dir = Path(__file__).parent.resolve()
-        self.cookie_browser = cookie_browser  # Browser to get cookies from
         
         # Ensure directories exist
         self.videos_dir.mkdir(exist_ok=True)
         self.music_dir.mkdir(exist_ok=True)
         
+        self.last_error = None
         self._cancel_requested = False
     
     def get_cookie_opts(self) -> dict:
-        """Get cookie options for yt-dlp based on available sources"""
+        """Get cookie options for yt-dlp (cookies.txt only)"""
         opts = {}
         
-        # First check if cookies.txt exists in app directory
+        # Check if cookies.txt exists in app directory
         cookies_file = self.app_dir / 'cookies.txt'
         if cookies_file.exists():
             print(f"[DEBUG] Using cookies file: {cookies_file}")
             opts['cookiefile'] = str(cookies_file)
-            return opts
-        
-        # Otherwise try browser cookies if configured
-        if self.cookie_browser and self.cookie_browser in self.SUPPORTED_BROWSERS:
-            print(f"[DEBUG] Using cookies from browser: {self.cookie_browser}")
-            opts['cookiesfrombrowser'] = (self.cookie_browser,)
         
         return opts
     

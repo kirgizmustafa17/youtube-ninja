@@ -320,8 +320,7 @@ class YouTubeDownloaderApp:
         
         self.downloader = YouTubeDownloader(
             videos_dir=self.config.output_video_dir,
-            music_dir=self.config.output_audio_dir,
-            cookie_browser=self.config.browser_for_cookies
+            music_dir=self.config.output_audio_dir
         )
         self.current_window: Optional[DownloadWindow] = None
         self.download_worker: Optional[DownloadWorker] = None
@@ -651,12 +650,35 @@ class YouTubeDownloaderApp:
         self.active_info_worker = None
         
         self.processed_urls.discard(url)
-        self.tray_icon.showMessage(
-            _('notification.error'),
-            f"{_('error.video_info_failed')}: {error[:50]}",
-            QSystemTrayIcon.Critical,
-            3000
-        )
+        
+        # Check for authentication/bot error
+        last_error = self.downloader.last_error or str(error)
+        is_auth_error = "Sign in" in last_error or "cookies" in last_error.lower() or "bot" in last_error.lower()
+        
+        if is_auth_error:
+            from PyQt5.QtWidgets import QMessageBox
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle(_('notification.error'))
+            msg.setText("YouTube oturum açma hatası (Bot tespiti).")
+            msg.setInformativeText(
+                "YouTube bot olduğunuzu düşünüyor.\n\n"
+                "Çözüm:\n"
+                "1. Tarayıcınızdan 'Get cookies.txt LOCALLY' eklentisini kurun.\n"
+                "2. YouTube'a giriş yapın ve cookie dosyasını indirin.\n"
+                "3. İndirdiğiniz 'cookies.txt' dosyasını bu uygulamanın\n"
+                "   olduğu klasöre kopyalayın.\n"
+                "4. Uygulamayı yeniden başlatın."
+            )
+            msg.addButton("Tamam", QMessageBox.AcceptRole)
+            msg.exec_()
+        else:
+            self.tray_icon.showMessage(
+                _('notification.error'),
+                f"{_('error.video_info_failed')}: {error[:50]}",
+                QSystemTrayIcon.Critical,
+                3000
+            )
         
         # Process next URL in queue
         self._process_next_url()

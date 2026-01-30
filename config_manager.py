@@ -18,7 +18,6 @@ DEFAULT_CONFIG = {
     'output_video_dir': '',  # Empty = ~/Videos
     'output_audio_dir': '',  # Empty = ~/Music
     'language': 'tr',  # Default language: Turkish
-    'browser_for_cookies': 'chrome',  # Browser to get cookies from (chrome, firefox, edge, brave, opera, vivaldi)
 }
 
 
@@ -146,14 +145,6 @@ class ConfigManager:
     @language.setter
     def language(self, value: str):
         self.set('language', value)
-    
-    @property
-    def browser_for_cookies(self) -> str:
-        return self.get('browser_for_cookies', 'chrome')
-    
-    @browser_for_cookies.setter
-    def browser_for_cookies(self, value: str):
-        self.set('browser_for_cookies', value)
     
     @staticmethod
     def get_available_qualities() -> list:

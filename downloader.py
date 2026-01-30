@@ -47,8 +47,11 @@ class YouTubeDownloader:
         self.last_error = None
         self._cancel_requested = False
     
-    def get_cookie_opts(self) -> dict:
-        """Get cookie options for yt-dlp (cookies.txt only)"""
+    def get_common_opts(self) -> dict:
+        """Get common yt-dlp options including cookies and JS runtime"""
+        import platform
+        import shutil
+        
         opts = {}
         
         # Check if cookies.txt exists in app directory
@@ -56,6 +59,27 @@ class YouTubeDownloader:
         if cookies_file.exists():
             print(f"[DEBUG] Using cookies file: {cookies_file}")
             opts['cookiefile'] = str(cookies_file)
+        
+        # Configure JS runtime (Deno preferred for yt-dlp)
+        # Check local deno first, then system deno
+        deno_local = self.app_dir / ('deno.exe' if platform.system() == 'Windows' else 'deno')
+        deno_system = shutil.which('deno')
+        
+        if deno_local.exists():
+            # Use local deno - need to add to extractor_args for js_runtimes
+            print(f"[DEBUG] Using local Deno: {deno_local}")
+            opts['extractor_args'] = {'youtube': ['js_runtimes=deno']}
+        elif deno_system:
+            print(f"[DEBUG] Using system Deno: {deno_system}")
+            opts['extractor_args'] = {'youtube': ['js_runtimes=deno']}
+        else:
+            # Try node as fallback
+            node_system = shutil.which('node')
+            if node_system:
+                print(f"[DEBUG] Using system Node.js: {node_system}")
+                opts['extractor_args'] = {'youtube': ['js_runtimes=node']}
+            else:
+                print("[DEBUG] No JS runtime found - some videos may fail")
         
         return opts
     
@@ -169,7 +193,7 @@ class YouTubeDownloader:
             'extract_flat': 'in_playlist',
             'socket_timeout': 30,
             'ignoreerrors': True,
-            **self.get_cookie_opts(),  # Add cookie options
+            **self.get_common_opts(),  # Add common options (cookies, js_runtimes)
         }
         
         try:
@@ -227,7 +251,7 @@ class YouTubeDownloader:
             'socket_timeout': 15,
             'retries': 2,
             'ignoreerrors': False,  # Don't ignore errors - we want to catch them
-            **self.get_cookie_opts(),  # Add cookie options
+            **self.get_common_opts(),  # Add common options (cookies, js_runtimes)
         }
         
         try:
@@ -437,7 +461,7 @@ class YouTubeDownloader:
                 {'key': 'FFmpegMetadata'},
                 {'key': 'EmbedThumbnail'},
             ],
-            **self.get_cookie_opts(),  # Add cookie options
+            **self.get_common_opts(),  # Add common options (cookies, js_runtimes)
         }
         
         try:
@@ -512,7 +536,7 @@ class YouTubeDownloader:
             'postprocessor_args': {
                 'thumbnailsconvertor': ['-vf', 'crop=in_h:in_h'],
             },
-            **self.get_cookie_opts(),  # Add cookie options
+            **self.get_common_opts(),  # Add common options (cookies, js_runtimes)
         }
         
         try:

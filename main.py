@@ -410,6 +410,9 @@ class YouTubeDownloaderApp:
         self.setup_tray_icon()
         self.setup_clipboard_monitor()
         
+        # Auto-update yt-dlp on startup (silent, in background)
+        self._update_ytdlp_startup()
+        
         # Check for FFmpeg at startup
         self._check_ffmpeg_startup()
         
@@ -425,6 +428,33 @@ class YouTubeDownloaderApp:
         self.timer.start(500)
         
         log_info("Application started")
+    
+    def _update_ytdlp_startup(self):
+        """Auto-update yt-dlp on startup using pip (runs in background)"""
+        import subprocess
+        import threading
+        
+        def update_thread():
+            try:
+                # Get the python executable from the current environment
+                python_exe = sys.executable
+                
+                # Run pip upgrade for yt-dlp and yt-dlp-ejs silently
+                subprocess.run(
+                    [python_exe, '-m', 'pip', 'install', '-U', 'yt-dlp', 'yt-dlp-ejs', '--quiet'],
+                    capture_output=True,
+                    timeout=60  # 60 second timeout
+                )
+                log_info("yt-dlp auto-update completed")
+            except subprocess.TimeoutExpired:
+                log_warning("yt-dlp auto-update timed out")
+            except Exception as e:
+                log_warning(f"yt-dlp auto-update failed: {e}")
+        
+        # Run update in background thread to not block app startup
+        thread = threading.Thread(target=update_thread, daemon=True)
+        thread.start()
+        log_info("yt-dlp auto-update started in background")
     
     def _check_ffmpeg_startup(self):
         """Check if FFmpeg is available at startup"""

@@ -22,39 +22,48 @@ Clipboard'dan YouTube linklerini otomatik algılayıp indiren Windows uygulamas�
 
 ## 📦 Kurulum
 
+### Windows
+
 ```bash
-# Repo'yu klonla
 git clone https://github.com/kirgizmustafa17/youtube-ninja.git
 cd youtube-ninja
+setup_windows.bat
+```
 
-# Virtual environment oluştur
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+### Linux
 
-# Bağımlılıkları yükle
-pip install -r requirements.txt
-
-# Uygulamayı başlat
-python main.py
+```bash
+git clone https://github.com/kirgizmustafa17/youtube-ninja.git
+cd youtube-ninja
+chmod +x setup_linux.sh run_linux.sh
+./setup_linux.sh
 ```
 
 ## 🚀 Kullanım
 
-1. `python main.py` ile uygulamayı başlat
+### Windows
+
+`run_windows.bat` dosyasına çift tıklayın veya terminalden çalıştırın.
+
+### Linux
+
+`./run_linux.sh` komutu ile başlatın.
+
+1. System tray'de YouTube ikonu belirir
 2. System tray'de YouTube ikonu belirir
 3. Herhangi bir YouTube linkini kopyala
 4. Otomatik olarak indirme penceresi açılır!
 
 ### Tray Menüsü
 
-| Seçenek | Açıklama |
-|---------|----------|
-| ☑️ MP3 İndir | Ses dosyası indir |
-| ☑️ Video İndir | Video dosyası indir |
-| 📺 Video Kalitesi | 360p - 8K arası seç |
+| Seçenek             | Açıklama                  |
+| ------------------- | ------------------------- |
+| ☑️ MP3 İndir        | Ses dosyası indir         |
+| ☑️ Video İndir      | Video dosyası indir       |
+| 📺 Video Kalitesi   | 360p - 8K arası seç       |
 | 📂 Çıktı Klasörleri | İndirme konumunu değiştir |
-| 🌍 Dil | Türkçe / İngilizce seçimi |
-| ℹ️ Hakkında | Sürüm bilgisi ve bağış |
+| 🌍 Dil              | Türkçe / İngilizce seçimi |
+| ℹ️ Hakkında         | Sürüm bilgisi ve bağış    |
 
 ## 📁 Dosya Yapısı
 
@@ -89,10 +98,12 @@ Ayarlar `config.json` dosyasında saklanır:
 ## 🎬 Desteklenen Formatlar
 
 ### Video Codec Önceliği
+
 - **1440p+**: AV1 → VP9 → HEVC → AVC
 - **1080p-**: AVC → VP9 → AV1
 
 ### Desteklenen URL'ler
+
 - `youtube.com/watch?v=...`
 - `youtu.be/...`
 - `youtube.com/shorts/...`
@@ -101,6 +112,7 @@ Ayarlar `config.json` dosyasında saklanır:
 ## 📝 Loglar
 
 Loglar `logs/` klasöründe günlük olarak saklanır:
+
 ```
 logs/app_20260108.log
 ```

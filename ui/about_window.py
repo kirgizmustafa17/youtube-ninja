@@ -12,6 +12,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
 from .styles import WINDOW_STYLE
+from i18n import _
 
 
 class AboutWindow(QDialog):
@@ -34,7 +35,7 @@ class AboutWindow(QDialog):
     
     def setup_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("Hakkında")
+        self.setWindowTitle(_("about.title"))
         self.setFixedSize(450, 420)
         self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
         
@@ -73,11 +74,11 @@ class AboutWindow(QDialog):
         
         # Version info
         info_items = [
-            ("Uygulama sürümü:", self.app_version),
-            ("yt-dlp sürümü:", self.ytdlp_version),
-            ("Python sürümü:", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"),
-            ("İşletim sistemi:", f"Windows {platform.version()}"),
-            ("Mimari:", platform.machine()),
+            (_("about.app_version"), self.app_version),
+            (_("about.ytdlp_version"), self.ytdlp_version),
+            (_("about.python_version"), f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"),
+            (_("about.os"), f"Windows {platform.version()}"),
+            (_("about.arch"), platform.machine()),
         ]
         
         for label, value in info_items:
@@ -100,8 +101,8 @@ class AboutWindow(QDialog):
         
         # Stats
         stats_items = [
-            ("Toplam indirme:", str(self.download_count)),
-            ("FFmpeg:", "✓ Yüklü" if self.ffmpeg_installed else "✗ Yüklü değil"),
+            (_("about.total_downloads"), str(self.download_count)),
+            ("FFmpeg:", _("about.installed") if self.ffmpeg_installed else _("about.not_installed")),
         ]
         
         for label, value in stats_items:
@@ -117,7 +118,7 @@ class AboutWindow(QDialog):
             layout.addLayout(row)
         
         # Copyright
-        copyright_label = QLabel("© 2024-2026 YouTube Ninja. Tüm hakları saklıdır.")
+        copyright_label = QLabel(_("about.copyright"))
         copyright_label.setAlignment(Qt.AlignCenter)
         copyright_label.setStyleSheet("color: #999; font-size: 10px;")
         layout.addWidget(copyright_label)
@@ -128,7 +129,7 @@ class AboutWindow(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
         
-        close_btn = QPushButton("Kapat")
+        close_btn = QPushButton(_("about.btn.close"))
         close_btn.setFixedHeight(32)
         close_btn.setStyleSheet("""
             QPushButton {
@@ -139,7 +140,7 @@ class AboutWindow(QDialog):
         """)
         close_btn.clicked.connect(self.close)
         
-        ffmpeg_btn = QPushButton("⬇️ FFmpeg")
+        ffmpeg_btn = QPushButton(f"⬇️ {_('about.check_ffmpeg')}")
         ffmpeg_btn.setFixedHeight(32)
         ffmpeg_btn.setStyleSheet("""
             QPushButton {
@@ -150,7 +151,7 @@ class AboutWindow(QDialog):
         """)
         ffmpeg_btn.clicked.connect(lambda: (self.ffmpeg_clicked.emit(), self.close()))
         
-        update_btn = QPushButton("🔄 Güncelle")
+        update_btn = QPushButton(_("about.btn.update"))
         update_btn.setFixedHeight(32)
         update_btn.setStyleSheet("""
             QPushButton {
@@ -161,7 +162,7 @@ class AboutWindow(QDialog):
         """)
         update_btn.clicked.connect(lambda: (self.update_clicked.emit(), self.close()))
         
-        donate_btn = QPushButton("❤️ Bağış Yap")
+        donate_btn = QPushButton(_("about.btn.donate"))
         donate_btn.setFixedHeight(32)
         donate_btn.setStyleSheet("""
             QPushButton {

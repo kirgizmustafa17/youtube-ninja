@@ -57,7 +57,7 @@ class FFmpegDownloader(QThread):
                 self.finished.emit(False, f"Desteklenmeyen sistem: {self.system}")
                 return
             
-            self.progress.emit(0, "FFmpeg indiriliyor...")
+            self.progress.emit(0, _("dialog.ffmpeg_downloading.label"))
             
             # Download file
             response = requests.get(url, stream=True)
@@ -118,8 +118,8 @@ class FFmpegDownloader(QThread):
                     import shutil
                     shutil.rmtree(item)
             
-            self.progress.emit(100, "Tamamlandı!")
-            self.finished.emit(True, f"FFmpeg başarıyla indirildi: {self.target_dir}")
+            self.progress.emit(100, _("notification.success"))
+            self.finished.emit(True, f"{_('notification.ffmpeg_downloaded')}: {self.target_dir}")
             
         except Exception as e:
             self.finished.emit(False, f"Hata: {str(e)}")
@@ -150,7 +150,7 @@ class DenoDownloader(QThread):
                 self.finished.emit(False, f"Desteklenmeyen sistem: {self.system}")
                 return
             
-            self.progress.emit(0, "Deno indiriliyor...")
+            self.progress.emit(0, _("dialog.deno_downloading.label"))
             
             # Download file
             response = requests.get(url, stream=True, allow_redirects=True)
@@ -187,8 +187,8 @@ class DenoDownloader(QThread):
             # Clean up
             archive_path.unlink()
             
-            self.progress.emit(100, "Tamamlandı!")
-            self.finished.emit(True, f"Deno başarıyla indirildi: {self.target_dir}")
+            self.progress.emit(100, _("notification.success"))
+            self.finished.emit(True, f"{_('notification.deno_downloaded')}: {self.target_dir}")
             
         except Exception as e:
             self.finished.emit(False, f"Hata: {str(e)}")
@@ -262,7 +262,7 @@ class VideoInfoWorker(QThread):
                 self.info_ready.emit(self.url, info)
             else:
                 print(f"[DEBUG] Emitting info_failed - no info")
-                self.info_failed.emit(self.url, "Video bilgileri alınamadı")
+                self.info_failed.emit(self.url, _("error.video_info_failed"))
         except Exception as e:
             print(f"[DEBUG] VideoInfoWorker exception: {e}")
             self.info_failed.emit(self.url, str(e))
@@ -289,7 +289,7 @@ class PlaylistInfoWorker(QThread):
                 print(f"[DEBUG] Playlist: {info['title']} - {info['video_count']} videos")
                 self.playlist_ready.emit(self.url, info)
             else:
-                self.playlist_failed.emit(self.url, "Playlist bilgileri alınamadı")
+                self.playlist_failed.emit(self.url, _("error.video_info_failed"))
         except Exception as e:
             print(f"[DEBUG] PlaylistInfoWorker exception: {e}")
             self.playlist_failed.emit(self.url, str(e))
@@ -370,6 +370,28 @@ def create_tray_icon() -> QPixmap:
     return pixmap
 
 
+
+class StartupUpdateWorker(QThread):
+    """Worker thread for startup yt-dlp updates"""
+    update_complete = pyqtSignal(bool, str)
+    
+    def run(self):
+        import subprocess
+        try:
+            # Get the python executable
+            python_exe = sys.executable
+            
+            # Run pip upgrade for yt-dlp and yt-dlp-ejs silently
+            subprocess.run(
+                [python_exe, '-m', 'pip', 'install', '-U', 'yt-dlp', 'yt-dlp-ejs', '--quiet'],
+                capture_output=True,
+                timeout=60
+            )
+            self.update_complete.emit(True, _("startup.ytdlp_update_done"))
+        except Exception as e:
+            self.update_complete.emit(False, str(e))
+
+
 class YouTubeDownloaderApp:
     """Main application class"""
     
@@ -408,16 +430,12 @@ class YouTubeDownloaderApp:
         self.pending_info_workers = {}  # Keep for cleanup
         
         self.setup_tray_icon()
-        self.setup_clipboard_monitor()
         
-        # Auto-update yt-dlp on startup (silent, in background)
-        self._update_ytdlp_startup()
+        # Flag to indicate if initialization is complete
+        self.is_initialized = False
         
-        # Check for FFmpeg at startup
-        self._check_ffmpeg_startup()
-        
-        # Check for Deno (JS runtime) at startup
-        self._check_deno_startup()
+        # Start initialization sequence after event loop starts
+        QTimer.singleShot(100, self._start_initialization_sequence)
         
         # Handle Ctrl+C gracefully
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -429,41 +447,26 @@ class YouTubeDownloaderApp:
         
         log_info("Application started")
     
-    def _update_ytdlp_startup(self):
-        """Auto-update yt-dlp on startup using pip (runs in background)"""
-        import subprocess
-        import threading
-        
-        def update_thread():
-            try:
-                # Get the python executable from the current environment
-                python_exe = sys.executable
-                
-                # Run pip upgrade for yt-dlp and yt-dlp-ejs silently
-                subprocess.run(
-                    [python_exe, '-m', 'pip', 'install', '-U', 'yt-dlp', 'yt-dlp-ejs', '--quiet'],
-                    capture_output=True,
-                    timeout=60  # 60 second timeout
-                )
-                log_info("yt-dlp auto-update completed")
-            except subprocess.TimeoutExpired:
-                log_warning("yt-dlp auto-update timed out")
-            except Exception as e:
-                log_warning(f"yt-dlp auto-update failed: {e}")
-        
-        # Run update in background thread to not block app startup
-        thread = threading.Thread(target=update_thread, daemon=True)
-        thread.start()
-        log_info("yt-dlp auto-update started in background")
-    
+
+    def _start_initialization_sequence(self):
+        """Start the sequential initialization process"""
+        log_info("Starting initialization sequence...")
+        self.tray_icon.showMessage(
+            _('app.name'),
+            _("startup.system_check"),
+            QSystemTrayIcon.Information,
+            2000
+        )
+        # Step 1: Check FFmpeg
+        self._check_ffmpeg_startup()
+
     def _check_ffmpeg_startup(self):
-        """Check if FFmpeg is available at startup"""
+        """Check if FFmpeg is available at startup - Step 1"""
         import shutil
         app_dir = Path(__file__).parent.resolve()
         
         # Check in app directory first
         ffmpeg_local = app_dir / ('ffmpeg.exe' if platform.system() == 'Windows' else 'ffmpeg')
-        
         # Check in system PATH
         ffmpeg_system = shutil.which('ffmpeg')
         
@@ -477,10 +480,74 @@ class YouTubeDownloaderApp:
                 QMessageBox.Yes
             )
             if reply == QMessageBox.Yes:
-                # Trigger FFmpeg download after app starts
-                QTimer.singleShot(1000, self._download_ffmpeg)
+                self._download_ffmpeg(startup=True)
+            else:
+                log_warning("User rejected FFmpeg download")
+                self._on_ffmpeg_check_complete(False)
         else:
-            log_info("FFmpeg found")
+            log_info(_("startup.ffmpeg_found"))
+            self._on_ffmpeg_check_complete(True)
+
+    def _on_ffmpeg_check_complete(self, success):
+        """Callback after FFmpeg check/download is done"""
+        # Step 2: Check Deno
+        self._check_deno_startup()
+
+    def _check_deno_startup(self):
+        """Check if Deno is available at startup - Step 2"""
+        import shutil
+        app_dir = Path(__file__).parent.resolve()
+        
+        # Check in app directory first
+        deno_local = app_dir / ('deno.exe' if platform.system() == 'Windows' else 'deno')
+        # Check in system PATH
+        deno_system = shutil.which('deno')
+        
+        if not deno_local.exists() and not deno_system:
+            # Deno not found - ask user to download
+            reply = QMessageBox.question(
+                None,
+                _('dialog.deno_not_found.title'),
+                _('dialog.deno_not_found.message'),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                self._download_deno(startup=True)
+            else:
+                log_warning("User rejected Deno download")
+                self._on_deno_check_complete(False)
+        else:
+            log_info(_("startup.deno_found"))
+            self._on_deno_check_complete(True)
+
+    def _on_deno_check_complete(self, success):
+        """Callback after Deno check/download is done"""
+        # Step 3: Update yt-dlp
+        self._update_ytdlp_startup()
+
+    def _update_ytdlp_startup(self):
+        """Auto-update yt-dlp - Step 3"""
+        self.startup_updater = StartupUpdateWorker()
+        self.startup_updater.update_complete.connect(self._on_ytdlp_startup_complete)
+        self.startup_updater.start()
+        log_info(_("startup.ytdlp_update"))
+
+    def _on_ytdlp_startup_complete(self, success, message):
+        """Callback after yt-dlp update is done"""
+        log_info(f"yt-dlp startup update done: {success} - {message}")
+        
+        # All checks done
+        self.is_initialized = True
+        self.setup_clipboard_monitor()
+        
+        self.tray_icon.showMessage(
+            _('app.name'),
+            _("startup.ready"),
+            QSystemTrayIcon.Information,
+            3000
+        )
+
     
     def setup_tray_icon(self):
         """Setup system tray icon and menu"""
@@ -491,14 +558,14 @@ class YouTubeDownloaderApp:
         # Create tray menu
         tray_menu = QMenu()
         
-        status_action = QAction("📋 Clipboard izleniyor...", self.app)
+        status_action = QAction(_("tray.clipboard_monitoring"), self.app)
         status_action.setEnabled(False)
         tray_menu.addAction(status_action)
         
         tray_menu.addSeparator()
         
         # Download options section
-        options_label = QAction("🛠️ İndirme Seçenekleri:", self.app)
+        options_label = QAction(_("tray.download_options"), self.app)
         options_label.setEnabled(False)
         tray_menu.addAction(options_label)
         
@@ -534,11 +601,11 @@ class YouTubeDownloaderApp:
         
         tray_menu.addSeparator()
         
-        videos_action = QAction("📁 Videos klasörünü aç", self.app)
+        videos_action = QAction(_("tray.open_videos_folder"), self.app)
         videos_action.triggered.connect(self._open_videos_folder)
         tray_menu.addAction(videos_action)
         
-        music_action = QAction("🎵 Music klasörünü aç", self.app)
+        music_action = QAction(_("tray.open_music_folder"), self.app)
         music_action.triggered.connect(self._open_music_folder)
         tray_menu.addAction(music_action)
         
@@ -676,8 +743,8 @@ class YouTubeDownloaderApp:
         
         # Show notification
         self.tray_icon.showMessage(
-            "YouTube Linki Algılandı",
-            "Video bilgileri alınıyor...",
+            _("notification.url_detected"),
+            _("notification.fetching"),
             QSystemTrayIcon.Information,
             2000
         )
@@ -734,8 +801,8 @@ class YouTubeDownloaderApp:
         
         if position > 0:
             self.tray_icon.showMessage(
-                "Kuyruğa Eklendi",
-                f"{video_info['title'][:50]}... (Sıra: {position + 1})",
+                _("queue.added"),
+                _("queue.added_msg").format(title=video_info['title'][:50], position=position + 1),
                 QSystemTrayIcon.Information,
                 2000
             )
@@ -761,17 +828,9 @@ class YouTubeDownloaderApp:
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Warning)
             msg.setWindowTitle(_('notification.error'))
-            msg.setText("YouTube oturum açma hatası (Bot tespiti).")
-            msg.setInformativeText(
-                "YouTube bot olduğunuzu düşünüyor.\n\n"
-                "Çözüm:\n"
-                "1. Tarayıcınızdan 'Get cookies.txt LOCALLY' eklentisini kurun.\n"
-                "2. YouTube'a giriş yapın ve cookie dosyasını indirin.\n"
-                "3. İndirdiğiniz 'cookies.txt' dosyasını bu uygulamanın\n"
-                "   olduğu klasöre kopyalayın.\n"
-                "4. Uygulamayı yeniden başlatın."
-            )
-            msg.addButton("Tamam", QMessageBox.AcceptRole)
+            msg.setText(_("error.auth_title"))
+            msg.setInformativeText(_("error.auth_msg"))
+            msg.addButton(_("error.auth_btn"), QMessageBox.AcceptRole)
             msg.exec_()
         else:
             self.tray_icon.showMessage(
@@ -861,7 +920,7 @@ class YouTubeDownloaderApp:
         
         self.tray_icon.showMessage(
             f"Playlist: {playlist_name[:30]}",
-            f"{total} video kuyruğa ekleniyor...",
+            _("playlist.adding_to_queue").format(count=total),
             QSystemTrayIcon.Information,
             3000
         )
@@ -898,8 +957,8 @@ class YouTubeDownloaderApp:
         """Handle failed playlist info fetch"""
         self.processed_urls.discard(url)
         self.tray_icon.showMessage(
-            "Playlist Hatası",
-            f"Playlist bilgileri alınamadı: {error[:50]}",
+            _("playlist.error"),
+            f"{_('error.video_info_failed')}: {error[:50]}",
             QSystemTrayIcon.Critical,
             3000
         )
@@ -938,20 +997,20 @@ class YouTubeDownloaderApp:
         
         # Update window labels based on options
         if not download_video:
-            self.current_window.video_status.setText("Devre dışı")
+            self.current_window.video_status.setText(_("download.disabled"))
             self.current_window.video_status.setStyleSheet("color: #888888;")
         if not download_audio:
-            self.current_window.audio_status.setText("Devre dışı")
+            self.current_window.audio_status.setText(_("download.disabled"))
             self.current_window.audio_status.setStyleSheet("color: #888888;")
         
         # Update window title with playlist info or queue count
         if playlist_position:
             self.current_window.setWindowTitle(
-                f"YouTube Downloader - [{playlist_position}] {playlist_name[:20] if playlist_name else ''}"
+                f"{_('download.window_title')} - [{playlist_position}] {playlist_name[:20] if playlist_name else ''}"
             )
         elif self.download_queue.pending_count > 0:
             self.current_window.setWindowTitle(
-                f"YouTube Downloader - {self.download_queue.pending_count} bekliyor"
+                _('download.waiting').format(count=self.download_queue.pending_count)
             )
         
         # Create download worker with options
@@ -979,8 +1038,8 @@ class YouTubeDownloaderApp:
             self.download_worker.wait(3000)
         
         self.tray_icon.showMessage(
-            "İndirme İptal Edildi",
-            "İndirme işlemi kullanıcı tarafından iptal edildi.",
+            _("queue.download_cancelled"),
+            _("queue.download_cancelled_msg"),
             QSystemTrayIcon.Warning,
             2000
         )
@@ -1017,11 +1076,11 @@ class YouTubeDownloaderApp:
                     thumbnail=self.current_window.video_info.get('thumbnail', '')
                 )
                 
-                msg = "İndirme tamamlandı!\n"
+                msg = _("notification.download_complete") + "\n"
                 if video_success:
-                    msg += "📹 Video: ~/Videos\n"
+                    msg += _("download.complete_video") + "\n"
                 if audio_success:
-                    msg += "🎵 Audio: ~/Music"
+                    msg += _("download.complete_music")
                 
                 # Play success sound
                 try:
@@ -1030,7 +1089,7 @@ class YouTubeDownloaderApp:
                     pass
                 
                 self.tray_icon.showMessage(
-                    "İndirme Tamamlandı",
+                    _("notification.download_complete"),
                     msg,
                     QSystemTrayIcon.Information,
                     3000
@@ -1048,8 +1107,8 @@ class YouTubeDownloaderApp:
                     pass
                 
                 self.tray_icon.showMessage(
-                    "İndirme Başarısız",
-                    "Video indirilemedi. Lütfen tekrar deneyin.",
+                    _("notification.download_error"),
+                    _("error.download_failed_msg"),
                     QSystemTrayIcon.Critical,
                     3000
                 )
@@ -1069,15 +1128,15 @@ class YouTubeDownloaderApp:
         """Change video output folder"""
         folder = QFileDialog.getExistingDirectory(
             None,
-            "Video Klasörü Seç",
+            _("folder.select_video"),
             str(self.config.output_video_dir)
         )
         if folder:
             self.config.output_video_dir = folder
             self.downloader.set_output_dirs(videos_dir=Path(folder))
             self.tray_icon.showMessage(
-                "Klasör Değiştirildi",
-                f"Video klasörü: {folder}",
+                _("folder.changed_title"),
+                _("folder.changed_video_msg").format(path=folder),
                 QSystemTrayIcon.Information,
                 2000
             )
@@ -1086,15 +1145,15 @@ class YouTubeDownloaderApp:
         """Change audio output folder"""
         folder = QFileDialog.getExistingDirectory(
             None,
-            "Müzik Klasörü Seç",
+            _("folder.select_music"),
             str(self.config.output_audio_dir)
         )
         if folder:
             self.config.output_audio_dir = folder
             self.downloader.set_output_dirs(music_dir=Path(folder))
             self.tray_icon.showMessage(
-                "Klasör Değiştirildi",
-                f"Müzik klasörü: {folder}",
+                _("folder.changed_title"),
+                _("folder.changed_music_msg").format(path=folder),
                 QSystemTrayIcon.Information,
                 2000
             )
@@ -1108,8 +1167,8 @@ class YouTubeDownloaderApp:
             music_dir=Path.home() / 'Music'
         )
         self.tray_icon.showMessage(
-            "Klasörler Sıfırlandı",
-            "Videos ve Music klasörleri varsayılana döndürüldü.",
+            _("folder.reset_title"),
+            _("folder.reset_msg"),
             QSystemTrayIcon.Information,
             2000
         )
@@ -1143,8 +1202,8 @@ class YouTubeDownloaderApp:
     def _update_ytdlp(self):
         """Update yt-dlp to latest version"""
         self.tray_icon.showMessage(
-            "Güncelleme Başlatıldı",
-            "yt-dlp güncelleniyor...",
+            _("startup.ytdlp_update"), # Reusing similar message
+            _("startup.ytdlp_update"),
             QSystemTrayIcon.Information,
             2000
         )
@@ -1172,7 +1231,7 @@ class YouTubeDownloaderApp:
             )
             log_error(f"yt-dlp update failed: {message}")
     
-    def _download_ffmpeg(self):
+    def _download_ffmpeg(self, startup=False):
         """Download FFmpeg from GitHub"""
         app_dir = Path(__file__).parent.resolve()
         
@@ -1199,7 +1258,7 @@ class YouTubeDownloaderApp:
         # Start download
         self.ffmpeg_downloader = FFmpegDownloader(app_dir)
         self.ffmpeg_downloader.progress.connect(self._on_ffmpeg_progress)
-        self.ffmpeg_downloader.finished.connect(self._on_ffmpeg_finished)
+        self.ffmpeg_downloader.finished.connect(lambda s, m: self._on_ffmpeg_finished(s, m, startup))
         self.ffmpeg_downloader.start()
     
     def _on_ffmpeg_progress(self, percent: int, status: str):
@@ -1208,7 +1267,7 @@ class YouTubeDownloaderApp:
             self.ffmpeg_progress.setValue(percent)
             self.ffmpeg_progress.setLabelText(status)
     
-    def _on_ffmpeg_finished(self, success: bool, message: str):
+    def _on_ffmpeg_finished(self, success: bool, message: str, startup: bool = False):
         """Handle FFmpeg download completion"""
         if hasattr(self, 'ffmpeg_progress'):
             self.ffmpeg_progress.close()
@@ -1227,34 +1286,12 @@ class YouTubeDownloaderApp:
                 QSystemTrayIcon.Critical,
                 3000
             )
+            
+        if startup:
+            self._on_ffmpeg_check_complete(success)
     
-    def _check_deno_startup(self):
-        """Check if Deno (JS runtime) is available at startup"""
-        import shutil
-        app_dir = Path(__file__).parent.resolve()
-        
-        # Check in app directory first
-        deno_local = app_dir / ('deno.exe' if platform.system() == 'Windows' else 'deno')
-        
-        # Check in system PATH
-        deno_system = shutil.which('deno')
-        
-        if not deno_local.exists() and not deno_system:
-            # Deno not found - ask user to download
-            reply = QMessageBox.question(
-                None,
-                _('dialog.deno_not_found.title'),
-                _('dialog.deno_not_found.message'),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes
-            )
-            if reply == QMessageBox.Yes:
-                # Trigger Deno download after app starts
-                QTimer.singleShot(500, self._download_deno)
-        else:
-            log_info("Deno found")
     
-    def _download_deno(self):
+    def _download_deno(self, startup=False):
         """Download Deno from GitHub"""
         app_dir = Path(__file__).parent.resolve()
         
@@ -1281,7 +1318,7 @@ class YouTubeDownloaderApp:
         # Start download
         self.deno_downloader = DenoDownloader(app_dir)
         self.deno_downloader.progress.connect(self._on_deno_progress)
-        self.deno_downloader.finished.connect(self._on_deno_finished)
+        self.deno_downloader.finished.connect(lambda s, m: self._on_deno_finished(s, m, startup))
         self.deno_downloader.start()
     
     def _on_deno_progress(self, percent: int, status: str):
@@ -1290,7 +1327,7 @@ class YouTubeDownloaderApp:
             self.deno_progress.setValue(percent)
             self.deno_progress.setLabelText(status)
     
-    def _on_deno_finished(self, success: bool, message: str):
+    def _on_deno_finished(self, success: bool, message: str, startup: bool = False):
         """Handle Deno download completion"""
         if hasattr(self, 'deno_progress'):
             self.deno_progress.close()
@@ -1309,6 +1346,9 @@ class YouTubeDownloaderApp:
                 QSystemTrayIcon.Critical,
                 3000
             )
+            
+        if startup:
+            self._on_deno_check_complete(success)
     
     def _signal_handler(self, signum, frame):
         """Handle system signals"""
@@ -1339,9 +1379,9 @@ class YouTubeDownloaderApp:
 
 def main():
     """Entry point"""
-    print("YouTube Clipboard Downloader başlatılıyor...")
-    print("Clipboard izleniyor. YouTube linklerini kopyalayın.")
-    print("Çıkmak için system tray ikonuna sağ tıklayıp 'Çıkış' seçin.")
+    print(_("app.starting"))
+    print(_("app.monitoring"))
+    print(_("app.exit_hint"))
     print("-" * 50)
     
     app = YouTubeDownloaderApp()

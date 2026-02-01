@@ -13,6 +13,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QSize, QThread, pyqtSlot, QTimer
 from PyQt5.QtGui import QPixmap, QIcon, QFont, QPainter, QBrush, QColor, QPainterPath
 
 from .styles import WINDOW_STYLE
+from i18n import _
 
 
 class ThumbnailLoader(QThread):
@@ -99,7 +100,7 @@ class DownloadWindow(QDialog):
     
     def setup_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("YouTube Downloader")
+        self.setWindowTitle(_("download.window_title"))
         # Use resize instead of setFixedSize to avoid Qt geometry warnings on Windows
         self.resize(500, 320)
         self.setMinimumSize(500, 320)
@@ -188,11 +189,11 @@ class DownloadWindow(QDialog):
         
         # Video progress section - dynamic label based on quality
         quality_label = f"maks. {self.video_quality}p" if int(self.video_quality) < 1440 else f"maks. {self.video_quality}p AV1"
-        self.video_section = QLabel(f"Video indiriliyor... ({quality_label})")
+        self.video_section = QLabel(_("download.video_downloading").format(quality=quality_label))
         self.video_section.setObjectName("sectionTitle")
         layout.addWidget(self.video_section)
         
-        self.video_status = QLabel("Hazırlanıyor...")
+        self.video_status = QLabel(_("download.status.ready"))
         self.video_status.setObjectName("statusLabel")
         layout.addWidget(self.video_status)
         
@@ -207,11 +208,11 @@ class DownloadWindow(QDialog):
         layout.addSpacing(12)
         
         # Audio progress section
-        audio_section = QLabel("Audio indiriliyor... (MP3)")
+        audio_section = QLabel(_("download.audio_downloading"))
         audio_section.setObjectName("sectionTitle")
         layout.addWidget(audio_section)
         
-        self.audio_status = QLabel("Bekliyor...")
+        self.audio_status = QLabel(_("download.status.waiting"))
         self.audio_status.setObjectName("statusLabel")
         layout.addWidget(self.audio_status)
         
@@ -229,7 +230,7 @@ class DownloadWindow(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        self.cancel_button = QPushButton("İptal Et")
+        self.cancel_button = QPushButton(_("download.cancel"))
         self.cancel_button.setObjectName("cancelButton")
         self.cancel_button.clicked.connect(self._on_cancel_clicked)
         button_layout.addWidget(self.cancel_button)
@@ -278,10 +279,10 @@ class DownloadWindow(QDialog):
         self._is_completed = True
         if success:
             if video_success:
-                self.video_status.setText("✓ Tamamlandı - ~/Videos")
+                self.video_status.setText(_("download.complete_video"))
                 self.video_status.setStyleSheet("color: #107c10;")
             if audio_success:
-                self.audio_status.setText("✓ Tamamlandı - ~/Music")
+                self.audio_status.setText(_("download.complete_music"))
                 self.audio_status.setStyleSheet("color: #107c10;")
             
             # Start countdown timer
@@ -291,11 +292,11 @@ class DownloadWindow(QDialog):
             self._countdown_timer.timeout.connect(self._on_countdown_tick)
             self._countdown_timer.start(1000)
         else:
-            self.cancel_button.setText("Kapat")
+            self.cancel_button.setText(_("download.close_button"))
     
     def _update_countdown_button(self):
         """Update button text with countdown"""
-        self.cancel_button.setText(f"Kapat ({self._countdown})")
+        self.cancel_button.setText(_("download.close_countdown").format(seconds=self._countdown))
     
     def _on_countdown_tick(self):
         """Handle countdown timer tick"""
